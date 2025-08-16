@@ -159,7 +159,7 @@ def get_image_prompt(cocktail_name, ingredients=None, use_gpt_transparency=False
     prompt = (
         f'A realistic illustration of a {cocktail_name} cocktail on a {background_color} background. '
         'The lighting and shading create depth and realism, making the drink appear fresh and inviting. '
-        'Do not include shadows, reflections, or the cocktail name in the image.'
+        'Do not include shadows, reflections, or the cocktail name in the image. Also only generate an image of the cocktail in the glass, not any other objects.'
     )
     if ingredients:
         prompt = f'{prompt} The cocktail ingredients are: {", ".join([ingredient for ingredient in ingredients])}'

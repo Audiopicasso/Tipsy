@@ -1,90 +1,68 @@
 {
   "cocktails": [
     {
-      "normal_name": "Vodka Sprite",
-      "fun_name": "Fizzy Lifter",
+      "normal_name": "Rum Punch",
+      "fun_name": "Tropical Wave",
       "ingredients": {
-        "Vodka": "1.5 oz",
-        "Sprite": "4 oz"
+        "Rum": "2 oz",
+        "Grenadinensirup": "1 oz",
+        "Limettensaft": "1 oz",
+        "Orangensaft": "2 oz"
       }
     },
     {
-      "normal_name": "Whiskey Sour",
-      "fun_name": "Sour Power",
+      "normal_name": "Vodka Sunrise",
+      "fun_name": "Morning Glow",
       "ingredients": {
-        "Whisky": "2 oz",
-        "Simple Syrup": "0.5 oz",
-        "Lime Juice": "1 oz"
+        "Wodka": "2 oz",
+        "Grenadinensirup": "1 oz",
+        "Orangensaft": "3 oz"
       }
     },
     {
       "normal_name": "Gin and Tonic",
-      "fun_name": "Tonic Delight",
+      "fun_name": "Herbal Breeze",
       "ingredients": {
         "Gin": "2 oz",
-        "Sprite": "3 oz"
-      }
-    },
-    {
-      "normal_name": "Rum Punch",
-      "fun_name": "Tropical Escape",
-      "ingredients": {
-        "Rum": "2 oz",
-        "Simple Syrup": "0.5 oz",
-        "Lime Juice": "1 oz",
-        "Sprite": "3 oz"
+        "Tonic Water": "4 oz",
+        "Limettensaft": "0.5 oz"
       }
     },
     {
       "normal_name": "Tequila Sunrise",
-      "fun_name": "Sunset in a Glass",
+      "fun_name": "Sunset Sizzle",
       "ingredients": {
         "Tequila": "2 oz",
-        "Simple Syrup": "0.5 oz",
-        "Lime Juice": "1 oz",
-        "Sprite": "4 oz"
+        "Orangensaft": "4 oz",
+        "Grenadinensirup": "0.5 oz"
       }
     },
     {
-      "normal_name": "Gin Fizz",
-      "fun_name": "Bubbly Breeze",
+      "normal_name": "Peach Martini",
+      "fun_name": "Fuzzy Delight",
       "ingredients": {
-        "Gin": "2 oz",
-        "Simple Syrup": "0.5 oz",
-        "Lime Juice": "1 oz",
-        "Sprite": "3 oz"
+        "Pfirsichlik\u00f6r": "1.5 oz",
+        "Wodka": "2 oz",
+        "Limettensaft": "0.5 oz"
       }
     },
     {
-      "normal_name": "Tequila Sour",
-      "fun_name": "Zesty Zing",
+      "normal_name": "Cranberry Spritzer",
+      "fun_name": "Berry Fizz",
+      "ingredients": {
+        "Cranberrysaft": "3 oz",
+        "Sprite": "3 oz",
+        "Limettensaft": "0.5 oz"
+      }
+    },
+    {
+      "normal_name": "Margarita",
+      "fun_name": "Citrus Snap",
       "ingredients": {
         "Tequila": "2 oz",
-        "Simple Syrup": "0.5 oz",
-        "Lime Juice": "1 oz",
-        "Bitters": "1 dash"
+        "Triple Sec": "1 oz",
+        "Limettensaft": "1 oz"
       }
-    },
-    {
-      "normal_name": "Whiskey and Sprite",
-      "fun_name": "Whiskey Spritz",
-      "ingredients": {
-        "Whisky": "2 oz",
-        "Sprite": "4 oz",
-        "Lime Juice": "0.5 oz"
-      }
-    },
-    {
-      "ingredients": {
-        "vodka": "0.75 oz",
-        "Sprite": "2.0 oz",
-        "whisky": "1.25 oz",
-        "Simple Syrup": "2.25 oz",
-        "Gin": "2.75 oz",
-        "rum": "3.0 oz"
-      },
-      "normal_name": "Jimmy juice ",
-      "fun_name": "Jimmy juice "
     }
   ]
 }
