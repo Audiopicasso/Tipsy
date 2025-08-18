@@ -20,13 +20,13 @@ settings = {
         'parse_method': json.loads,
         'default': 'false'
     }, 
-    'OZ_COEFFICIENT': {
+    'ML_COEFFICIENT': {
         'parse_method': float,
-        'default': '8.0'
+        'default': '0.16'
     }, 
     'PUMP_CONCURRENCY': {
         'parse_method': int,
-        'default': '3'
+        'default': '4'
     }, 
     'RELOAD_COCKTAILS_TIMEOUT': {
         'parse_method': int,
@@ -34,7 +34,7 @@ settings = {
     }, 
     'RETRACTION_TIME': {
         'parse_method': float,
-        'default': '0'
+        'default': '0.5'
     }, 
     'COCKTAIL_IMAGE_SCALE': {
         'parse_method': float,
@@ -42,7 +42,7 @@ settings = {
     }, 
     'INVERT_PUMP_PINS': {
         'parse_method': json.loads,
-        'default': 'true'
+        'default': 'false'
     }, 
     'FULL_SCREEN': {
         'parse_method': json.loads,
@@ -71,3 +71,18 @@ for name in settings:
 
 if DEBUG:
     logging.basicConfig(level=logging.DEBUG)
+
+# ===================== PUMP CALIBRATION =====================
+
+# ML_COEFFICIENT: How many seconds to pump 1ml of liquid
+# Example: If it takes 8 seconds to pump 50ml, then ML_COEFFICIENT = 8.0 / 50.0 = 0.16
+ML_COEFFICIENT = 0.16  # Sekunden pro ml
+
+# RETRACTION_TIME: How many seconds to reverse the pump after pouring (to prevent dripping)
+RETRACTION_TIME = 0.5  # seconds
+
+# PUMP_CONCURRENCY: How many pumps can run simultaneously
+PUMP_CONCURRENCY = 4
+
+# INVERT_PUMP_PINS: Set to True if your pump motors run in the opposite direction
+INVERT_PUMP_PINS = False

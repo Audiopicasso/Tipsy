@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "bot_token": "8463781380:AAGJx4WS9-BbexKQEd8--SsMsNm3l6xxXJ8",
+  "chat_id": "-4856527293",
+  "notifications": {
+    "warning": true,
+    "critical": true,
+    "empty": true
+  }
+}

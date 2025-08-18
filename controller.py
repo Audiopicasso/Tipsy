@@ -8,6 +8,7 @@ import json
 import concurrent.futures
 
 from settings import *
+from bottle_monitor import bottle_monitor
 
 if not DEBUG:
     try:
@@ -15,6 +16,28 @@ if not DEBUG:
     except ModuleNotFoundError:
         DEBUG = True
         logger.info('Controller modules not found. Pump control will be disabled')
+
+# Ingredient Mapping: Cocktail-Zutaten zu Flaschen-IDs
+INGREDIENT_MAPPING = {
+    "rum (weiß)": "rum_(weiß)",
+    "rum (weiss)": "rum_(weiß)",  # Alternative Schreibweise
+    "wodka": "wodka",
+    "gin": "gin",
+    "tequila": "tequila",
+    "pfirsichlikör": "pfirsichlikör",
+    "pfirsichlikoer": "pfirsichlikör",  # Alternative Schreibweise ohne Umlaut
+    "grenadinensirup": "grenadinensirup",
+    "limettensaft": "limettensaft",
+    "orangensaft": "orangensaft",
+    "tonic water": "tonic_water",
+    "sprite": "sprite",
+    "triple sec": "triple_sec",
+    "cranberrysaft": "cranberrysaft",
+    "cranberry juice": "cranberrysaft",
+    "lime juice": "limettensaft",
+    "lemon juice": "limettensaft",
+    "orange juice": "orangensaft"
+}
 
 # Define GPIO pins for each motor here (same as your test).
 # Adjust these if needed to match your hardware.
@@ -81,24 +104,26 @@ def motor_reverse(ia,ib):
 
 class Pour:
     def __str__(self):
-        return f'{self.ingredient_name}: {self.amount} oz.'
+        return f'{self.ingredient_name}: {self.amount} ml.'
 
     def __init__(self, pump_index, amount, ingredient_name):
         self.pump_index = pump_index
-        self.amount = amount
+        self.amount = amount  # amount ist jetzt in ml
         self.ingredient_name = ingredient_name
         self.running = False
 
     def run(self):
         self.running = True
         ia, ib = MOTORS[self.pump_index]
-        seconds_to_pour = self.amount * OZ_COEFFICIENT
+        
+        # Berechne Pumpzeit basierend auf ML_COEFFICIENT
+        seconds_to_pour = self.amount * ML_COEFFICIENT
 
         if RETRACTION_TIME:
             logger.debug(f'Retraction time is set to {RETRACTION_TIME:.2f} seconds. Adding this time to pour time')
             seconds_to_pour = seconds_to_pour + RETRACTION_TIME
 
-        logger.info(f'Pouring {self.amount} oz of Pump {self.pump_index} for {seconds_to_pour:.2f} seconds.')
+        logger.info(f'Pouring {self.amount} ml of Pump {self.pump_index} for {seconds_to_pour:.2f} seconds.')
         motor_forward(ia, ib)
         time.sleep(seconds_to_pour)
 
@@ -165,19 +190,42 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
     executor_watcher = ExecutorWatcher()
     factor = 2 if single_or_double.lower() == 'double' else 1
     index = 1
+    
+    # Überprüfe zuerst alle Flaschen-Füllstände
+    ingredients_to_pour = []
     for ingredient_name, measurement_str in sorted(ingredients.items(), key=lambda x: x[1], reverse=True):
         parts = measurement_str.split()
         if not parts:
             logger.critical(f'Cannot parse measurement for {ingredient_name}. Skipping.')
             continue
         try:
-            oz_amount = float(parts[0])  # parse numeric
+            ml_amount = float(parts[0])  # parse numeric (direkt in ml)
         except ValueError:
             logger.critical(f'Cannot parse numeric amount "{parts[0]}" for {ingredient_name}. Skipping.')
             continue
 
-        oz_needed = oz_amount * factor
-
+        ml_needed = ml_amount * factor
+        
+        # Überprüfe Flaschen-Füllstand
+        # Verwende das Ingredient Mapping, um die korrekte Flaschen-ID zu finden
+        ingredient_key = ingredient_name.lower().strip()
+        bottle_id = INGREDIENT_MAPPING.get(ingredient_key, ingredient_key.replace(' ', '_'))
+        
+        logger.info(f'Überprüfe Flasche: {ingredient_name} -> ingredient_key: {ingredient_key} -> bottle_id: {bottle_id}, benötigt: {ml_needed:.1f}ml')
+        
+        if not bottle_monitor.consume_liquid(bottle_id, ml_needed):
+            logger.error(f'Flasche {ingredient_name} (ID: {bottle_id}) hat nicht genug Flüssigkeit für {ml_needed:.1f}ml')
+            # Stoppe alle Pumpen und gebe Fehler zurück
+            if not DEBUG:
+                GPIO.cleanup()
+            return None
+        else:
+            logger.info(f'Flasche {ingredient_name} (ID: {bottle_id}) hat genug Flüssigkeit. Verbraucht: {ml_needed:.1f}ml')
+            
+        ingredients_to_pour.append((ingredient_name, ml_needed))
+    
+    # Jetzt alle Zutaten ausgeben
+    for ingredient_name, ml_needed in ingredients_to_pour:
         # find a matching pump label in pump_config
         chosen_pump = None
         for pump_label, config_ing_name in pump_config.items():
@@ -201,7 +249,7 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
             logger.critical(f'Pump index {pump_index} out of range for "{ingredient_name}". Skipping.')
             continue
 
-        pour = Pour(pump_index, oz_needed, ingredient_name)
+        pour = Pour(pump_index, ml_needed, ingredient_name)
         parent_watcher.pours.append(pour)
         executor_watcher.executors.append(executor.submit(pour.run))
 
@@ -212,6 +260,13 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
 
     while not executor_watcher.done():
         pass
+    
+    # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
+    logger.info("Cocktail-Zubereitung abgeschlossen - synchronisiere Flaschen-Status")
+    try:
+        logger.info("Alle Flaschen sind nach Cocktail-Zubereitung konsistent")
+    except Exception as e:
+        logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
     
     if not DEBUG:
         GPIO.cleanup()

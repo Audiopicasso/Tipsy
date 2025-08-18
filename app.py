@@ -11,6 +11,7 @@ from dotenv import set_key
 import assist
 from settings import *
 from helpers import *
+from bottle_monitor import bottle_monitor
 
 # Import your controller module
 import controller
@@ -95,6 +96,52 @@ def _write_cocktails(data: dict):
     except Exception as e:
         st.error(f"Error saving cocktails: {e}")
         return False
+
+def _clear_ui_overlays():
+    """Bereinigt UI-Overlays und Session State Variablen die Probleme verursachen können"""
+    # Liste der Session State Keys die potentielle Overlay-Probleme verursachen
+    overlay_keys = [
+        "changing_image_for",
+        "selected_cocktail",
+        "editing_bottle_level",
+        "editing_bottle_capacity", 
+        "editing_bottle_thresholds"
+    ]
+    
+    # Entferne spezifische Keys
+    for key in overlay_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Entferne alle Upload-bezogenen Keys
+    upload_keys = [key for key in st.session_state.keys() if "upload" in key.lower()]
+    for key in upload_keys:
+        del st.session_state[key]
+    
+    # Entferne alle Edit-bezogenen Keys
+    edit_keys = [key for key in st.session_state.keys() if "editing_" in key]
+    for key in edit_keys:
+        del st.session_state[key]
+
+def _filter_available_cocktails(cocktails: list) -> tuple:
+    """Filtert Cocktails basierend auf verfügbaren Zutaten"""
+    available_cocktails = []
+    unavailable_cocktails = []
+    
+    for cocktail in cocktails:
+        ingredients = cocktail.get("ingredients", {})
+        can_make, missing_ingredients = bottle_monitor.can_make_cocktail(
+            [(ingredient.lower(), float(amount.split()[0])) 
+             for ingredient, amount in ingredients.items()]
+        )
+        
+        if can_make:
+            available_cocktails.append(cocktail)
+        else:
+            cocktail["missing_ingredients"] = missing_ingredients
+            unavailable_cocktails.append(cocktail)
+    
+    return available_cocktails, unavailable_cocktails
 
 def _rename_logo(old_safe: str, new_safe: str):
     src = _logo_path(old_safe)
@@ -249,7 +296,7 @@ def _cache_buster(path: Path) -> float:
 if not OPENAI_API_KEY and "openai_api_key" not in st.session_state:
     st.title("Enter OpenAI API Key")
     key_input = st.text_input("OpenAI API Key", type="password")
-    if st.button("Submit"):
+    if st.button("Submit", use_container_width=True):
         st.session_state["openai_api_key"] = key_input
         set_key(".env", "OPENAI_API_KEY", key_input)
         st.rerun()
@@ -274,7 +321,16 @@ cocktail_data = _load_cocktails()
 
 
 # ===================== Tabs =====================
-tabs = st.tabs(["My Bar", "Settings", "Cocktail Menu", "Add Cocktail"])
+
+# Globaler "Clear UI" Button für Overlay-Probleme  
+col_title, col_clear = st.columns([4, 1])
+with col_clear:
+    if st.button("🧹 Clear UI", help="Behebt Overlay-Probleme und setzt UI-Elemente zurück", use_container_width=True):
+        _clear_ui_overlays()
+        st.success("✅ UI zurückgesetzt!")
+        st.rerun()
+
+tabs = st.tabs(["My Bar", "Settings", "Cocktail Menu", "Bottle Monitor"])
 
 
 # ================ TAB 1: My Bar ================
@@ -302,7 +358,7 @@ with tabs[0]:
     bartender_requests = st.text_area("Enter any special requests for the bartender", height=100)
     clear_cocktails = st.checkbox("Remove existing cocktails from the menu")
 
-    if st.button("Generate Recipes"):
+    if st.button("Generate Recipes", use_container_width=True):
         pump_to_drink = {p: d for p, d in pump_inputs.items() if d.strip()}
         save_config(pump_to_drink)
 
@@ -331,8 +387,47 @@ with tabs[0]:
 with tabs[1]:
     st.title("Settings")
 
+    st.subheader("Pump Calibration")
+    st.info("💡 Konfiguriere hier, wie lange eine Pumpe laufen muss, um 50ml zu pumpen")
+    
+    # ML-Koeffizient Konfiguration
+    ml_coefficient = st.number_input(
+        "Sekunden für 50ml",
+        min_value=1.0,
+        max_value=60.0,
+        value=8.0,
+        step=0.5,
+        help="Wie viele Sekunden braucht eine Pumpe, um 50ml zu pumpen?"
+    )
+    
+    if st.button("💾 Kalibrierung speichern", use_container_width=True):
+        try:
+            # Lade aktuelle Settings
+            settings_file = Path("settings.py")
+            if settings_file.exists():
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Ersetze OZ_COEFFICIENT durch ML_COEFFICIENT
+                if "OZ_COEFFICIENT" in content:
+                    # Berechne den neuen Koeffizienten (50ml = 1.69 oz)
+                    new_coefficient = ml_coefficient / 50.0  # Sekunden pro ml
+                    content = content.replace(
+                        "OZ_COEFFICIENT = 8.0",
+                        f"ML_COEFFICIENT = {new_coefficient:.4f}  # Sekunden pro ml"
+                    )
+                    
+                    with open(settings_file, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    
+                    st.success(f"✅ Kalibrierung gespeichert: {ml_coefficient}s für 50ml ({new_coefficient:.4f}s/ml)")
+                else:
+                    st.warning("⚠️ OZ_COEFFICIENT nicht in settings.py gefunden")
+        except Exception as e:
+            st.error(f"❌ Fehler beim Speichern der Kalibrierung: {e}")
+
     st.subheader("Prime Pumps")
-    if st.button("Prime Pumps"):
+    if st.button("Prime Pumps", use_container_width=True):
         st.info("Priming all pumps for 10 seconds each...")
         try:
             controller.prime_pumps(duration=10)
@@ -341,7 +436,7 @@ with tabs[1]:
             st.error(f"Error priming pumps: {e}")
 
     st.subheader("Clean Pumps")
-    if st.button("Clean Pumps"):
+    if st.button("Clean Pumps", use_container_width=True):
         st.info("Reversing all pumps for 10 seconds each (cleaning mode)...")
         try:
             controller.clean_pumps(duration=10)
@@ -350,7 +445,7 @@ with tabs[1]:
             st.error(f"Error cleaning pumps: {e}")
 
     st.subheader("Interface Control")
-    if st.button("Refresh Interface"):
+    if st.button("Refresh Interface", use_container_width=True):
         st.info("Signaling interface to refresh cocktail list...")
         if _send_interface_refresh_signal():
             st.success("Interface refresh signal sent!")
@@ -360,6 +455,11 @@ with tabs[1]:
 with tabs[2]:
     st.markdown('<h1 style="text-align: center;">Cocktail Menu</h1>', unsafe_allow_html=True)
 
+    # Flaschen-Status anzeigen
+    overall_status = bottle_monitor.get_overall_status()
+    if overall_status["empty_bottles"] > 0 or overall_status["low_bottles"] > 0:
+        st.warning(f"⚠️ **Flaschen-Status:** {overall_status['empty_bottles']} leere Flaschen, {overall_status['low_bottles']} niedrige Füllstände")
+    
     if st.session_state.selected_cocktail:
         # DETAIL VIEW
         safe_name = st.session_state.selected_cocktail
@@ -380,6 +480,87 @@ with tabs[2]:
 
             st.markdown(f'<h1 style="text-align: center;">{fun_cur}</h1>', unsafe_allow_html=True)
             st.markdown(f'<h3 style="text-align: center;">{norm_cur}</h3>', unsafe_allow_html=True)
+
+            # Überprüfe, ob der Cocktail zubereitet werden kann
+            ingredients = selected.get("ingredients", {})
+            can_make, missing_ingredients = bottle_monitor.can_make_cocktail(
+                [(ingredient.lower(), float(amount.split()[0])) 
+                 for ingredient, amount in ingredients.items()]
+            )
+            
+            if not can_make:
+                st.error(f"❌ **Cocktail kann nicht zubereitet werden:**")
+                for missing in missing_ingredients:
+                    st.write(f"• {missing}")
+                st.info("💡 Fülle die entsprechenden Flaschen auf oder überprüfe den Flaschenstatus im 'Bottle Monitor' Tab")
+            else:
+                st.success("✅ **Cocktail kann zubereitet werden** - alle Zutaten verfügbar")
+
+            # Rezept/Zutaten anzeigen
+            st.divider()
+            st.subheader("🍹 Rezept")
+            
+            if ingredients:
+                # Erstelle eine schöne Tabelle für das Rezept
+                recipe_data = []
+                total_volume = 0
+                
+                for ingredient, amount in ingredients.items():
+                    # Prüfe, ob die Zutat verfügbar ist
+                    ingredient_key = ingredient.lower().strip()
+                    amount_ml = float(amount.split()[0])
+                    total_volume += amount_ml
+                    
+                    ingredient_mapping = bottle_monitor._get_ingredient_mapping()
+                    bottle_id = ingredient_mapping.get(ingredient_key, ingredient_key.replace(' ', '_'))
+                    bottle = bottle_monitor.get_bottle_status(bottle_id)
+                    
+                    if bottle and bottle["current_ml"] >= amount_ml:
+                        status = "✅"
+                        availability = f"Verfügbar ({bottle['current_ml']:.0f}ml vorrätig)"
+                    else:
+                        status = "❌"
+                        if bottle:
+                            availability = f"Nicht genug ({bottle['current_ml']:.0f}ml vorrätig)"
+                        else:
+                            availability = "Flasche nicht gefunden"
+                    
+                    recipe_data.append({
+                        "Status": status,
+                        "Zutat": ingredient,
+                        "Menge": amount,
+                        "Verfügbarkeit": availability
+                    })
+                
+                # Zeige die Rezept-Tabelle
+                col_status, col_ingredient, col_amount, col_availability = st.columns([0.5, 2, 1, 2])
+                
+                with col_status:
+                    st.write("**Status**")
+                with col_ingredient:
+                    st.write("**Zutat**")
+                with col_amount:
+                    st.write("**Menge**")
+                with col_availability:
+                    st.write("**Verfügbarkeit**")
+                
+                for item in recipe_data:
+                    col_status, col_ingredient, col_amount, col_availability = st.columns([0.5, 2, 1, 2])
+                    
+                    with col_status:
+                        st.write(item["Status"])
+                    with col_ingredient:
+                        st.write(item["Zutat"])
+                    with col_amount:
+                        st.write(item["Menge"])
+                    with col_availability:
+                        st.caption(item["Verfügbarkeit"])
+                
+                # Zeige Gesamtvolumen
+                st.info(f"🥃 **Gesamtvolumen:** {total_volume:.0f}ml")
+                
+            else:
+                st.write("Keine Zutaten verfügbar")
 
             # Bild *hart* neu laden (Cache-Buster)
             img_path = Path(get_cocktail_image_path(selected))
@@ -405,10 +586,10 @@ with tabs[2]:
                 key="edit_logo_uploader"
             )
 
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.5, 1])
 
             with c1:
-                if st.button("Save changes", key="save_changes_btn"):
+                if st.button("Save changes", key="save_changes_btn", use_container_width=True):
                     data = _load_cocktails()
                     cur_safe = _safe_name(norm_cur)
                     new_norm_clean = (new_norm or norm_cur).strip()
@@ -443,7 +624,7 @@ with tabs[2]:
                             st.rerun()
 
             with c2:
-                if st.button("Delete cocktail", key="delete_cocktail_btn"):
+                if st.button("Delete cocktail", key="delete_cocktail_btn", use_container_width=True):
                     confirm = st.checkbox("Really delete this cocktail?", key="confirm_delete_chk")
                     if confirm:
                         with st.spinner("Deleting cocktail..."):
@@ -460,7 +641,7 @@ with tabs[2]:
                                 st.error("❌ Failed to delete cocktail. Please try again.")
 
             with c3:
-                if st.button("🔄 Generate New Image", key="generate_detail_img_btn"):
+                if st.button("🔄 Generate New Image", key="generate_detail_img_btn", use_container_width=True):
                     with st.spinner("Generating new image..."):
                         try:
                             # Generiere ein neues Bild für diesen spezifischen Cocktail
@@ -479,225 +660,536 @@ with tabs[2]:
                             st.error(f"❌ Error generating image: {e}")
 
             with c4:
-                if st.button("Back to Menu", key="back_to_menu_btn"):
+                if st.button("🔙 Back to Menu", key="back_to_menu_btn", use_container_width=True):
                     st.session_state.selected_cocktail = None
                     st.rerun()
 
-            st.divider()
-            st.markdown('<h2 style="text-align: center;">Recipe</h2>', unsafe_allow_html=True)
-            recipe_adj = {}
-            for ingredient, measurement in selected.get("ingredients", {}).items():
-                parts = str(measurement).split()
-                try:
-                    default_val = float(parts[0])
-                    unit = " ".join(parts[1:]) if len(parts) > 1 else ""
-                except Exception:
-                    default_val = 1.0
-                    unit = str(measurement)
-                val = st.slider(
-                    f"{ingredient} ({measurement})",
-                    min_value=0.0,
-                    max_value=max(default_val * 4, 1.0),
-                    value=default_val,
-                    step=0.1
-                )
-                recipe_adj[ingredient] = f"{val} {unit}".strip()
-            st.markdown('<h3 style="text-align: center;"><strong>Adjusted Recipe</strong></h3>', unsafe_allow_html=True)
-            st.json(recipe_adj)
-
-            cc1, cc2 = st.columns(2)
-            with cc1:
-                if st.button("Save Recipe", key="save_recipe_btn"):
-                    data = _load_cocktails()
-                    updated = False
-                    for idx, cktl in enumerate(data.get("cocktails", [])):
-                        if _safe_name(cktl.get("normal_name", "")) == st.session_state.selected_cocktail:
-                            data["cocktails"][idx]["ingredients"] = recipe_adj
-                            updated = True
-                            break
-                    if updated and _write_cocktails(data):
-                        _send_interface_refresh_signal()
-                        st.success("Recipe saved and interface refreshed!")
-                    elif not updated:
-                        st.error("Failed to update recipe.")
-            with cc2:
-                if st.button("Pour", key="pour_btn"):
-                    note = st.info("Pouring a single serving...")
-                    try:
-                        executor_watcher = controller.make_drink(selected, single_or_double="single")
-                        while not executor_watcher.done():
-                            pass
-                        note.empty()
-                    except Exception as e:
-                        st.error(f"Error while pouring: {e}")
-
     else:
         # GALLERY VIEW
-        cocktails_list = cocktail_data.get("cocktails", [])
-        if cocktails_list:
-            for c in cocktails_list:
-                norm = c.get("normal_name", "unknown_drink")
-                fun = c.get("fun_name", norm)
-                safe_c = _safe_name(norm)
-                path = Path(get_cocktail_image_path(c))
-
-                st.markdown(f'<h3 style="text-align: center;">{fun} <small>({norm})</small></h3>', unsafe_allow_html=True)
-                if path.exists():
-                    # Bytes + Cache-Buster mit zusätzlichem Timestamp
-                    img_bytes = path.read_bytes()
-                    cache_timestamp = _cache_buster(path)
-                    # Füge Session State Timestamp hinzu für zusätzlichen Cache-Bust
-                    session_timestamp = st.session_state.get("image_update_timestamp", 0)
-                    st.image(img_bytes, width=300, caption=f"updated@{cache_timestamp}@{session_timestamp}")
-                else:
-                    st.markdown('<p style="text-align: center;">Image not found.</p>', unsafe_allow_html=True)
-
-                b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1, 1])
-                with b1:
-                    if st.button("View", key=f"view_{safe_c}"):
-                        st.session_state.selected_cocktail = safe_c
-                        st.rerun()
-                with b2:
-                    if st.button("Pour", key=f"pour_{safe_c}"):
-                        note = st.info(f"Pouring a single serving of {norm} ...")
-                        try:
-                            executor_watcher = controller.make_drink(c, single_or_double="single")
-                            while not executor_watcher.done():
-                                pass
-                            note.empty()
-                        except Exception as e:
-                            st.error(f"Error while pouring: {e}")
-                with b3:
-                    if st.button("Delete", key=f"delete_{safe_c}"):
-                        confirm = st.checkbox(f"Really delete {norm}?", key=f"confirm_delete_{safe_c}")
-                        if confirm:
-                            with st.spinner(f"Deleting {norm}..."):
-                                if _delete_cocktail_and_assets(safe_c):
-                                    st.success(f"✅ {norm} successfully deleted!")
-                                    # Force immediate interface refresh
-                                    _send_interface_refresh_signal()
-                                    # Update session state to force reload
-                                    st.session_state.image_update_timestamp = time.time()
-                                    # Rerun to show updated cocktail list
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to delete cocktail. Please try again.")
-                with b4:
-                    if st.button("Change Image", key=f"change_img_{safe_c}"):
-                        st.session_state.changing_image_for = safe_c
-                        st.rerun()
-                with b5:
-                    if st.button("🔄 Generate New Image", key=f"generate_img_{safe_c}"):
-                        with st.spinner(f"Generating new image for {norm}..."):
-                            try:
-                                # Generiere ein neues Bild für diesen spezifischen Cocktail
-                                api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
-                                if generate_image(norm, regenerate=True, ingredients=c.get("ingredients", {}), api_key=api_key):
-                                    st.success(f"✅ New image generated for {norm}!")
-                                    # Sende Interface-Refresh-Signal
-                                    _send_interface_refresh_signal()
-                                    # Update session state to force reload
-                                    st.session_state.image_update_timestamp = time.time()
-                                    # Rerun to show new image
-                                    st.rerun()
-                                else:
-                                    st.error(f"❌ Failed to generate new image for {norm}")
-                            except Exception as e:
-                                st.error(f"❌ Error generating image: {e}")
-                
-                # Bild-Upload-Bereich (wird nur angezeigt wenn "Change Image" geklickt wurde)
-                if st.session_state.get("changing_image_for") == safe_c:
-                    # Debug info
-                    st.info(f"Debug: changing_image_for = {st.session_state.get('changing_image_for')}, safe_c = {safe_c}")
-                    st.markdown("---")
-                    st.markdown(f"**🖼️ Change image for {fun}**")
-                    
-                    # Zeige aktuelles Bild mit Cache-Buster
-                    current_path = Path(get_cocktail_image_path(c))
-                    if current_path.exists():
-                        st.markdown("**Current image:**")
-                        img_bytes = current_path.read_bytes()
-                        st.image(img_bytes, width=200, caption=f"Current image (updated@{_cache_buster(current_path)})")
-                    
-                    uploaded_image = st.file_uploader(
-                        f"📤 Upload new image for {fun} (PNG/JPG)",
-                        type=["png", "jpg", "jpeg"],
-                        key=f"image_upload_{safe_c}",
-                        help="Select a new image file to replace the current cocktail image"
-                    )
-                    
-                    col_upload1, col_upload2 = st.columns(2)
-                    with col_upload1:
-                        if st.button("💾 Save New Image", key=f"save_img_{safe_c}", type="primary"):
-                            if uploaded_image is not None:
-                                with st.spinner("Saving image..."):
-                                    if _save_uploaded_logo(safe_c, uploaded_image):
-                                        # Überprüfe sofort, ob das Bild verfügbar ist
-                                        if _verify_image_immediately(safe_c):
-                                            # Sende Interface-Refresh-Signal
-                                            _send_interface_refresh_signal()
-                                            st.success(f"✅ Image updated for {fun}! Interface refreshed.")
-                                            st.session_state.changing_image_for = None
-                                            # Einfacher Rerun ohne komplexe Cache-Invalidierung
-                                            st.rerun()
-                                        else:
-                                            st.error("❌ Image saved but not immediately available. Please refresh the page.")
+        cocktail_data = _load_cocktails()
+        cocktails = cocktail_data.get("cocktails", [])
+        
+        if not cocktails:
+            st.info("No cocktails found. Go to 'My Bar' to generate some!")
+        else:
+            # Add New Cocktail Section
+            st.subheader("➕ Neuen Cocktail hinzufügen")
+            
+            # Container für bessere Kontrolle über das Layout
+            with st.container():
+                col_add1, col_add2, col_add3 = st.columns([1.2, 1, 1.5])
+                with col_add1:
+                    new_cocktail_name = st.text_input("Cocktail Name", placeholder="z.B. Margarita", key="new_cocktail_name")
+                with col_add2:
+                    new_cocktail_fun = st.text_input("Fun Name", placeholder="z.B. Citrus Snap", key="new_cocktail_fun")
+                with col_add3:
+                    # Text Area in eigenem Container für bessere Kontrolle
+                    ingredients_container = st.container()
+                    with ingredients_container:
+                        new_cocktail_ingredients = st.text_area("Zutaten (Format: Zutat: Menge ml)", 
+                                                               placeholder="Tequila: 50 ml\nTriple Sec: 25 ml\nLime Juice: 25 ml", 
+                                                               height=100, key="new_cocktail_ingredients")
+            
+            if st.button("➕ Cocktail hinzufügen", key="add_cocktail_btn", type="primary", use_container_width=True):
+                if new_cocktail_name and new_cocktail_fun and new_cocktail_ingredients:
+                    try:
+                        # Parse ingredients
+                        ingredients_dict = {}
+                        for line in new_cocktail_ingredients.strip().split('\n'):
+                            if ':' in line:
+                                ingredient, amount = line.split(':', 1)
+                                ingredients_dict[ingredient.strip()] = amount.strip()
+                        
+                        if ingredients_dict:
+                            # Create new cocktail
+                            new_cocktail = {
+                                "normal_name": new_cocktail_name.strip(),
+                                "fun_name": new_cocktail_fun.strip(),
+                                "ingredients": ingredients_dict
+                            }
+                            
+                            # Add to cocktails
+                            cocktail_data["cocktails"].append(new_cocktail)
+                            if _write_cocktails(cocktail_data):
+                                st.success(f"✅ Cocktail '{new_cocktail_name}' erfolgreich hinzugefügt!")
+                                
+                                # Generate image for new cocktail
+                                with st.spinner("Generiere Bild für neuen Cocktail..."):
+                                    api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
+                                    if generate_image(new_cocktail_name, regenerate=True, ingredients=ingredients_dict, api_key=api_key):
+                                        st.success("✅ Bild erfolgreich generiert!")
+                                        _send_interface_refresh_signal()
+                                        st.rerun()
                                     else:
-                                        st.error("❌ Failed to save image.")
+                                        st.warning("⚠️ Cocktail hinzugefügt, aber Bildgenerierung fehlgeschlagen")
+                                        st.rerun()
                             else:
-                                st.warning("⚠️ Please select an image first.")
+                                st.error("❌ Fehler beim Speichern des Cocktails")
+                        else:
+                            st.error("❌ Bitte geben Sie gültige Zutaten ein")
+                    except Exception as e:
+                        st.error(f"❌ Fehler beim Hinzufügen des Cocktails: {e}")
+                else:
+                    st.warning("⚠️ Bitte füllen Sie alle Felder aus")
+            
+            st.markdown("---")
+            
+            # Cocktails nach Verfügbarkeit filtern
+            available_cocktails, unavailable_cocktails = _filter_available_cocktails(cocktails)
+            
+            # Verfügbare Cocktails anzeigen
+            if available_cocktails:
+                st.subheader("🍹 Verfügbare Cocktails")
+                for c in available_cocktails:
+                    fun = c.get("fun_name", "Cocktail")
+                    norm = c.get("normal_name", "cocktail")
+                    safe_c = _safe_name(norm)
                     
-                    with col_upload2:
-                        if st.button("❌ Cancel", key=f"cancel_img_{safe_c}"):
-                            st.session_state.changing_image_for = None
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"**{fun}** ({norm})")
+                    with col2:
+                        st.success("✅ Verfügbar")
+                    
+                    # Bild anzeigen
+                    path = Path(get_cocktail_image_path(c))
+                    if path.exists():
+                        # Bytes + Cache-Buster mit zusätzlichem Timestamp
+                        img_bytes = path.read_bytes()
+                        cache_timestamp = _cache_buster(path)
+                        # Füge Session State Timestamp hinzu für zusätzlichen Cache-Bust
+                        session_timestamp = st.session_state.get("image_update_timestamp", 0)
+                        st.image(img_bytes, width=300, caption=f"updated@{cache_timestamp}@{session_timestamp}")
+                    else:
+                        st.markdown('<p style="text-align: center;">Image not found.</p>', unsafe_allow_html=True)
+                    
+                    # Buttons
+                    b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1, 1.2])
+                    with b1:
+                        if st.button("View", key=f"view_{safe_c}", use_container_width=True):
+                            st.session_state.selected_cocktail = safe_c
                             st.rerun()
-        else:
-            st.markdown('<p style="text-align: center;">No recipes generated yet. Please use the "My Bar" tab to generate recipes.</p>', unsafe_allow_html=True)
+                    with b2:
+                        if st.button("Pour", key=f"pour_{safe_c}", use_container_width=True):
+                            note = st.info(f"Pouring a single serving of {norm} ...")
+                            try:
+                                executor_watcher = controller.make_drink(c, single_or_double="single")
+                                while not executor_watcher.done():
+                                    pass
+                                
+                                # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
+                                # WICHTIG: Nur die Konfiguration neu laden, NICHT refresh_bottles_from_pumps aufrufen
+                                # da das die verbrauchten Mengen überschreiben würde
+                                bottle_monitor.reload_config_from_file()
+                                
+                                # Session State für UI-Update setzen
+                                st.session_state.cocktail_just_made = True
+                                st.session_state.last_bottle_update = 0
+                                st.session_state.bottle_update_timestamp = time.time()
+                                
+                                # Sofortiges Rerun ohne Nachrichten
+                                st.rerun()
+                                
+                            except Exception as e:
+                                st.error(f"Error while pouring: {e}")
+                    with b3:
+                        if st.button("Delete", key=f"delete_{safe_c}", use_container_width=True):
+                            confirm = st.checkbox(f"Really delete {norm}?", key=f"confirm_delete_{safe_c}")
+                            if confirm:
+                                with st.spinner(f"Deleting {norm}..."):
+                                    if _delete_cocktail_and_assets(safe_c):
+                                        st.success(f"✅ {norm} successfully deleted!")
+                                        # Force immediate interface refresh
+                                        _send_interface_refresh_signal()
+                                        # Update session state to force reload
+                                        st.session_state.image_update_timestamp = time.time()
+                                        # Rerun to refresh the list
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Failed to delete {norm}")
+                    with b4:
+                        if st.button("🖼️ Change Image", key=f"change_img_{safe_c}", use_container_width=True):
+                            st.session_state.changing_image_for = safe_c
+                            st.rerun()
+                    with b5:
+                        if st.button("🎨 Generate New Image", key=f"generate_img_{safe_c}", use_container_width=True):
+                            with st.spinner(f"Generating new image for {fun}..."):
+                                try:
+                                    api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
+                                    if generate_image(norm, regenerate=True, ingredients=c.get("ingredients", {}), api_key=api_key):
+                                        st.success(f"✅ New image generated for {fun}!")
+                                        # Sende Interface-Refresh-Signal
+                                        _send_interface_refresh_signal()
+                                        # Update session state to force reload
+                                        st.session_state.image_update_timestamp = time.time()
+                                        # Rerun to show new image
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Failed to generate new image for {fun}")
+                                except Exception as e:
+                                    st.error(f"❌ Error generating image: {e}")
+                    
+                    # Bild-Upload-Bereich (wird nur angezeigt wenn "Change Image" geklickt wurde)
+                    if st.session_state.get("changing_image_for") == safe_c:
+                        # Container für das Upload-Menü mit expliziter Kontrolle
+                        with st.container():
+                            st.markdown("---")
+                            st.markdown(f"**🖼️ Change image for {fun}**")
+                            
+                            # Zeige aktuelles Bild
+                            current_path = Path(get_cocktail_image_path(c))
+                            if current_path.exists():
+                                st.markdown("**Current image:**")
+                                img_bytes = current_path.read_bytes()
+                                st.image(img_bytes, width=200, caption="Current image")
+                            
+                            # Upload-Bereich in eigenem Container
+                            upload_container = st.container()
+                            with upload_container:
+                                uploaded_image = st.file_uploader(
+                                    f"📤 Upload new image for {fun} (PNG/JPG)",
+                                    type=["png", "jpg", "jpeg"],
+                                    key=f"image_upload_{safe_c}",
+                                    help="Upload a new image to replace the current one"
+                                )
+                            
+                            # Buttons in eigener Zeile
+                            col_upload1, col_upload2, col_upload3 = st.columns([1.2, 1, 1])
+                            with col_upload1:
+                                if st.button("💾 Save New Image", key=f"save_img_{safe_c}", type="primary", use_container_width=True):
+                                    if uploaded_image is not None:
+                                        with st.spinner("Saving image..."):
+                                            if _save_uploaded_logo(safe_c, uploaded_image):
+                                                # Überprüfe sofort, ob das Bild verfügbar ist
+                                                if _verify_image_immediately(safe_c):
+                                                    # Sende Interface-Refresh-Signal
+                                                    _send_interface_refresh_signal()
+                                                    st.success(f"✅ Image updated for {fun}! Interface refreshed.")
+                                                    # Explizit Session State zurücksetzen
+                                                    st.session_state.changing_image_for = None
+                                                    if f"image_upload_{safe_c}" in st.session_state:
+                                                        del st.session_state[f"image_upload_{safe_c}"]
+                                                    st.rerun()
+                                                else:
+                                                    st.error("❌ Image saved but could not be verified. Please refresh the page.")
+                                            else:
+                                                st.error("❌ Failed to save image.")
+                                    else:
+                                        st.warning("⚠️ Please select an image first.")
+                            
+                            with col_upload2:
+                                if st.button("❌ Cancel", key=f"cancel_img_{safe_c}", use_container_width=True):
+                                    # Explizit alle relevanten Session State Variablen zurücksetzen
+                                    st.session_state.changing_image_for = None
+                                    if f"image_upload_{safe_c}" in st.session_state:
+                                        del st.session_state[f"image_upload_{safe_c}"]
+                                    st.rerun()
+                            
+                            with col_upload3:
+                                # Zusätzlicher "Clear" Button um sicherzustellen, dass alles zurückgesetzt wird
+                                if st.button("🧹 Clear", key=f"clear_img_{safe_c}", use_container_width=True):
+                                    # Alle relevanten Session State Variablen löschen
+                                    keys_to_delete = [key for key in st.session_state.keys() if safe_c in key]
+                                    for key in keys_to_delete:
+                                        del st.session_state[key]
+                                    st.session_state.changing_image_for = None
+                                    st.rerun()
+                    
+                    st.markdown("---")
+            
+            # Nicht verfügbare Cocktails anzeigen
+            if unavailable_cocktails:
+                st.subheader("🚫 Nicht verfügbare Cocktails")
+                st.warning("Diese Cocktails können nicht zubereitet werden, da Zutaten fehlen:")
+                
+                for c in unavailable_cocktails:
+                    fun = c.get("fun_name", "Cocktail")
+                    norm = c.get("normal_name", "cocktail")
+                    missing_ingredients = c.get("missing_ingredients", [])
+                    
+                    st.write(f"**{fun}** ({norm})")
+                    st.write("Fehlende Zutaten:")
+                    for missing in missing_ingredients:
+                        st.write(f"• {missing}")
+                    
+                    # Bild anzeigen (grau gestrichelt)
+                    path = Path(get_cocktail_image_path(c))
+                    if path.exists():
+                        img_bytes = path.read_bytes()
+                        st.image(img_bytes, width=300, caption="❌ Nicht verfügbar")
+                    else:
+                        st.markdown('<p style="text-align: center; color: gray;">Image not found.</p>', unsafe_allow_html=True)
+                    
+                    st.markdown("---")
 
 
-# ================ TAB 4: Add Cocktail ================
+# ================ TAB 4: Bottle Monitor ================
 with tabs[3]:
-    st.markdown('<h1 style="text-align: center;">Add Cocktail</h1>', unsafe_allow_html=True)
-    st.markdown('<h2 style="text-align: center;">Recipe</h2>', unsafe_allow_html=True)
-
-    recipe = {"ingredients": {}}
-    recipe["normal_name"] = st.text_input("Cocktail Name")
-    recipe["fun_name"] = st.text_input("Fun Name (optional)", value=recipe["normal_name"])
-    upload_logo = st.file_uploader(
-        "Upload cocktail image (PNG/JPG) — optional (will be saved as {safe_name}.png)",
-        type=["png", "jpg", "jpeg"],
-        key="add_logo"
-    )
-
-    for _, pump in enumerate(saved_config):
-        ingredient = saved_config[pump]
-        val = st.slider(f"{ingredient} (oz)", min_value=0.0, max_value=4.0, value=0.0, step=0.25)
-        if val > 0:
-            recipe["ingredients"][ingredient] = f"{val} oz".strip()
-
-    if st.button("Save", key="add_save_btn") and recipe["normal_name"] and len(recipe["ingredients"]) > 0:
-        data = _load_cocktails()
-        existing = [x.get("normal_name", "") for x in data.get("cocktails", [])]
-        if recipe["normal_name"] not in existing:
-            api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
-            safe_new = _safe_name(recipe["normal_name"])
-
-            if upload_logo is not None:
-                ok_img = _save_uploaded_logo(safe_new, upload_logo)
-                if not ok_img:
-                    st.warning("Could not save uploaded image; generating one instead.")
-                    generate_image(recipe["normal_name"], False, recipe["ingredients"], api_key=api_key)
+    st.markdown('<h1 style="text-align: center;">🍾 Flaschen-Überwachung</h1>', unsafe_allow_html=True)
+    
+    # Prüfe, ob gerade ein Cocktail zubereitet wurde
+    if st.session_state.get('cocktail_just_made', False):
+        st.success("🍹 Cocktail erfolgreich zubereitet! Füllstände wurden aktualisiert.")
+        st.session_state.cocktail_just_made = False
+    
+    # Automatische Aktualisierung alle 5 Sekunden ODER nach Cocktail-Zubereitung
+    if 'last_bottle_update' not in st.session_state:
+        st.session_state.last_bottle_update = 0
+    
+    if 'bottle_update_timestamp' not in st.session_state:
+        st.session_state.bottle_update_timestamp = 0
+    
+    current_time = time.time()
+    # Aktualisiere alle 5 Sekunden ODER wenn ein Cocktail zubereitet wurde
+    if (current_time - st.session_state.last_bottle_update > 5 or 
+        st.session_state.bottle_update_timestamp > st.session_state.last_bottle_update):
+        
+        # Lade Konfiguration aus Datei neu (behält verbrauchte Mengen bei)
+        bottle_monitor.reload_config_from_file()
+        
+        st.session_state.last_bottle_update = current_time
+    
+    # Refresh-Button für Flaschen aus Pumpen-Konfiguration
+    col_refresh, col_sync, col_info = st.columns([1, 1, 2])
+    with col_refresh:
+        if st.button("🔄 Flaschen aktualisieren", use_container_width=True):
+            with st.spinner("Aktualisiere Flaschen aus Pumpen-Konfiguration..."):
+                bottle_monitor.refresh_bottles_from_pumps()
+                st.session_state.last_bottle_update = time.time()
+                st.success("Flaschen aktualisiert!")
+                st.rerun()
+    
+    with col_sync:
+        if st.button("🔗 IDs synchronisieren", use_container_width=True):
+            with st.spinner("Synchronisiere Flaschen-IDs mit Controller..."):
+                bottle_monitor.sync_bottle_ids_with_controller()
+                st.session_state.last_bottle_update = time.time()
+                st.success("Flaschen-IDs synchronisiert!")
+                st.rerun()
+    
+    with col_info:
+        st.info("💡 Flaschen werden automatisch aus der Pumpen-Konfiguration im 'My Bar' Tab generiert")
+    
+    # Gesamtstatus anzeigen
+    overall_status = bottle_monitor.get_overall_status()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Gesamt-Flaschen", overall_status["total_bottles"])
+    with col2:
+        st.metric("Leere Flaschen", overall_status["empty_bottles"], delta=f"-{overall_status['empty_bottles']}")
+    with col3:
+        st.metric("Niedrige Füllstände", overall_status["low_bottles"], delta=f"-{overall_status['low_bottles']}")
+    with col4:
+        st.metric("Gesamt-Füllstand", f"{overall_status['overall_percentage']}%")
+    
+    st.markdown("---")
+    
+    # Einzelne Flaschen anzeigen
+    st.subheader("📊 Einzelne Flaschen")
+    
+    # Lade die aktuellsten Daten vor der Anzeige
+    bottle_monitor.reload_config_from_file()
+    bottles = bottle_monitor.get_all_bottles()
+    
+    # Debug-Info für Entwicklung
+    if len(bottles) == 0:
+        st.warning("⚠️ Keine Flaschen gefunden. Klicke auf '🔄 Flaschen aktualisieren' um sie zu laden.")
+    for bottle_id, bottle in bottles.items():
+        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+        
+        with col1:
+            st.write(f"**{bottle['name']}** ({bottle_id})")
+        
+        with col2:
+            percentage = bottle_monitor.get_bottle_usage_percentage(bottle_id)
+            st.progress(percentage / 100, text=f"{percentage:.1f}%")
+        
+        with col3:
+            st.write(f"{bottle['current_ml']:.0f}ml")
+        
+        with col4:
+            st.write(f"Kapazität: {bottle['capacity_ml']:.0f}ml")
+            st.caption(f"Warnung: {bottle['warning_threshold_ml']:.0f}ml | Kritisch: {bottle['critical_threshold_ml']:.0f}ml")
+        
+        with col5:
+            # Füllstand und Kapazität manuell setzen - alle Buttons untereinander
+            if st.button(f"📝 Füllstand", key=f"set_{bottle_id}"):
+                st.session_state[f"editing_{bottle_id}"] = True
+            
+            if st.button(f"📏 Kapazität", key=f"cap_{bottle_id}"):
+                st.session_state[f"editing_cap_{bottle_id}"] = True
+            
+            if st.button(f"⚙️ Schwellen", key=f"thresh_{bottle_id}"):
+                st.session_state[f"editing_thresh_{bottle_id}"] = True
+            
+            # Neuer Button: Flasche auffüllen (auf 100%)
+            if st.button(f"🔄 Auffüllen", key=f"refill_{bottle_id}", type="primary", use_container_width=True):
+                if bottle_monitor.set_bottle_level(bottle_id, bottle['capacity_ml']):
+                    # Erzwinge globale Synchronisation
+                    bottle_monitor.force_global_sync()
+                    
+                    # Session State für UI-Update setzen
+                    st.session_state.last_bottle_update = 0
+                    st.session_state.bottle_update_timestamp = time.time()
+                    
+                    st.success(f"🔄 Flasche {bottle['name']} auf {bottle['capacity_ml']:.0f}ml aufgefüllt!")
+                    # UI sofort aktualisieren
+                    st.rerun()
+                else:
+                    st.error("Fehler beim Auffüllen der Flasche")
+            
+            # Füllstand bearbeiten
+            if st.session_state.get(f"editing_{bottle_id}", False):
+                new_level = st.number_input(
+                    f"Neuer Füllstand (ml)",
+                    min_value=0.0,
+                    max_value=float(bottle['capacity_ml']),
+                    value=float(bottle['current_ml']),
+                    step=50.0,
+                    key=f"level_{bottle_id}"
+                )
+                
+                # Speichern und Abbrechen Buttons untereinander
+                if st.button("💾 Speichern", key=f"save_{bottle_id}", use_container_width=True):
+                    if bottle_monitor.set_bottle_level(bottle_id, new_level):
+                        st.success(f"Füllstand für {bottle['name']} auf {new_level}ml gesetzt")
+                        st.session_state[f"editing_{bottle_id}"] = False
+                        # UI sofort aktualisieren
+                        st.rerun()
+                    else:
+                        st.error("Fehler beim Setzen des Füllstands")
+                
+                if st.button("❌ Abbrechen", key=f"cancel_{bottle_id}", use_container_width=True):
+                    st.session_state[f"editing_{bottle_id}"] = False
+                    st.rerun()
+            
+            # Kapazität bearbeiten
+            if st.session_state.get(f"editing_cap_{bottle_id}", False):
+                new_capacity = st.number_input(
+                    f"Neue Kapazität (ml)",
+                    min_value=100.0,
+                    max_value=5000.0,
+                    value=float(bottle['capacity_ml']),
+                    step=100.0,
+                    key=f"cap_input_{bottle_id}"
+                )
+                
+                # Speichern und Abbrechen Buttons untereinander
+                if st.button("💾 Kapazität speichern", key=f"save_cap_{bottle_id}", use_container_width=True):
+                    if bottle_monitor.set_bottle_capacity(bottle_id, new_capacity):
+                        st.success(f"Kapazität für {bottle['name']} auf {new_capacity}ml gesetzt")
+                        st.session_state[f"editing_cap_{bottle_id}"] = False
+                        st.rerun()
+                    else:
+                        st.error("Fehler beim Setzen der Kapazität")
+                
+                if st.button("❌ Abbrechen", key=f"cancel_cap_{bottle_id}", use_container_width=True):
+                    st.session_state[f"editing_cap_{bottle_id}"] = False
+                    st.rerun()
+            
+            # Warnschwellen bearbeiten
+            if st.session_state.get(f"editing_thresh_{bottle_id}", False):
+                col_warn, col_crit = st.columns(2)
+                
+                with col_warn:
+                    new_warning = st.number_input(
+                        f"Warnschwelle (ml)",
+                        min_value=10.0,
+                        max_value=float(bottle['capacity_ml'] * 0.8),
+                        value=float(bottle['warning_threshold_ml']),
+                        step=10.0,
+                        key=f"warn_input_{bottle_id}"
+                    )
+                
+                with col_crit:
+                    new_critical = st.number_input(
+                        f"Kritische Schwelle (ml)",
+                        min_value=5.0,
+                        max_value=float(new_warning),
+                        value=float(bottle['critical_threshold_ml']),
+                        step=5.0,
+                        key=f"crit_input_{bottle_id}"
+                    )
+                
+                # Speichern und Abbrechen Buttons untereinander
+                if st.button("💾 Schwellen speichern", key=f"save_thresh_{bottle_id}", use_container_width=True):
+                    if bottle_monitor.set_bottle_thresholds(bottle_id, new_warning, new_critical):
+                        st.success(f"Warnschwellen für {bottle['name']} gesetzt")
+                        st.session_state[f"editing_thresh_{bottle_id}"] = False
+                        st.rerun()
+                    else:
+                        st.error("Fehler beim Setzen der Warnschwellen")
+                
+                if st.button("❌ Abbrechen", key=f"cancel_thresh_{bottle_id}", use_container_width=True):
+                    st.session_state[f"editing_thresh_{bottle_id}"] = False
+                    st.rerun()
+        
+        # Trennlinie zwischen den Flaschen
+        st.markdown("---")
+    
+    st.markdown("---")
+    
+    # Telegram-Konfiguration
+    st.subheader("📱 Telegram-Benachrichtigungen")
+    
+    if st.button("⚙️ Telegram konfigurieren", use_container_width=True):
+        st.session_state["configuring_telegram"] = True
+    
+    if st.session_state.get("configuring_telegram", False):
+        telegram_config = bottle_monitor.telegram_config
+        
+        col1, col2 = st.columns([1.2, 1])
+        with col1:
+            enabled = st.checkbox("Telegram aktivieren", value=telegram_config.get("enabled", False))
+            bot_token = st.text_input("Bot Token", value=telegram_config.get("bot_token", ""), type="password")
+        
+        with col2:
+            chat_id = st.text_input("Chat ID", value=telegram_config.get("chat_id", ""))
+            
+            st.write("**Benachrichtigungen:**")
+            warning_notif = st.checkbox("Warnungen", value=telegram_config["notifications"].get("warning", True))
+            critical_notif = st.checkbox("Kritische Warnungen", value=telegram_config["notifications"].get("critical", True))
+            empty_notif = st.checkbox("Leere Flaschen", value=telegram_config["notifications"].get("empty", True))
+        
+        col_save_telegram, col_cancel_telegram = st.columns([1.5, 1])
+        with col_save_telegram:
+            if st.button("💾 Telegram-Einstellungen speichern", use_container_width=True):
+                # Neue Konfiguration speichern
+                new_config = {
+                    "enabled": enabled,
+                    "bot_token": bot_token,
+                    "chat_id": chat_id,
+                    "notifications": {
+                        "warning": warning_notif,
+                        "critical": critical_notif,
+                        "empty": empty_notif
+                    }
+                }
+                
+                try:
+                    with open("telegram_config.json", "w", encoding="utf-8") as f:
+                        json.dump(new_config, f, indent=2, ensure_ascii=False)
+                    
+                    # BottleMonitor neu laden
+                    bottle_monitor.telegram_config = new_config
+                    st.success("Telegram-Einstellungen gespeichert!")
+                    st.session_state["configuring_telegram"] = False
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Fehler beim Speichern: {e}")
+        
+        with col_cancel_telegram:
+            if st.button("❌ Abbrechen", use_container_width=True):
+                st.session_state["configuring_telegram"] = False
+                st.rerun()
+    
+    # Test-Nachricht senden
+    if st.button("📤 Test-Nachricht senden", use_container_width=True):
+        if bottle_monitor.telegram_config.get("enabled", False):
+            if bottle_monitor._send_telegram_message("🧪 Test-Nachricht von Tipsy Cocktail Mixer"):
+                st.success("Test-Nachricht erfolgreich gesendet!")
             else:
-                generate_image(recipe["normal_name"], False, recipe["ingredients"], api_key=api_key)
-
-            data.setdefault("cocktails", []).append({
-                "normal_name": recipe["normal_name"],
-                "fun_name": recipe.get("fun_name") or recipe["normal_name"],
-                "ingredients": recipe["ingredients"]
-            })
-
-            if _write_cocktails(data):
-                _send_interface_refresh_signal()
-                st.success("Cocktail saved and interface refresh signal sent!")
+                st.error("Fehler beim Senden der Test-Nachricht")
         else:
-            st.error("A cocktail with this name already exists.")
+            st.warning("Telegram ist nicht aktiviert")

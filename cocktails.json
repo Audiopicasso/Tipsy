@@ -1,67 +1,63 @@
 {
   "cocktails": [
     {
-      "normal_name": "Rum Punch",
-      "fun_name": "Tropical Wave",
+      "normal_name": "Tropical Rum Punch",
+      "fun_name": "Island Vibes",
       "ingredients": {
-        "Rum": "2 oz",
-        "Grenadinensirup": "1 oz",
-        "Limettensaft": "1 oz",
-        "Orangensaft": "2 oz"
+        "Rum (weiss)": "60 ml",
+        "Pfirsichlikoer": "30 ml",
+        "Grenadinensirup": "15 ml",
+        "Limettensaft": "20 ml",
+        "Orangensaft": "100 ml"
       }
     },
     {
-      "normal_name": "Vodka Sunrise",
-      "fun_name": "Morning Glow",
-      "ingredients": {
-        "Wodka": "2 oz",
-        "Grenadinensirup": "1 oz",
-        "Orangensaft": "3 oz"
-      }
-    },
-    {
-      "normal_name": "Gin and Tonic",
-      "fun_name": "Herbal Breeze",
-      "ingredients": {
-        "Gin": "2 oz",
-        "Tonic Water": "4 oz",
-        "Limettensaft": "0.5 oz"
-      }
-    },
-    {
-      "normal_name": "Tequila Sunrise",
-      "fun_name": "Sunset Sizzle",
-      "ingredients": {
-        "Tequila": "2 oz",
-        "Orangensaft": "4 oz",
-        "Grenadinensirup": "0.5 oz"
-      }
-    },
-    {
-      "normal_name": "Peach Martini",
+      "normal_name": "Peach Vodka Fizz",
       "fun_name": "Fuzzy Delight",
       "ingredients": {
-        "Pfirsichlik\u00f6r": "1.5 oz",
-        "Wodka": "2 oz",
-        "Limettensaft": "0.5 oz"
+        "Wodka": "50 ml",
+        "Pfirsichlikoer": "25 ml",
+        "Sprite": "150 ml",
+        "Limettensaft": "15 ml"
       }
     },
     {
-      "normal_name": "Cranberry Spritzer",
-      "fun_name": "Berry Fizz",
+      "normal_name": "Classic Gin and Tonic",
+      "fun_name": "Herbal Spritz",
       "ingredients": {
-        "Cranberrysaft": "3 oz",
-        "Sprite": "3 oz",
-        "Limettensaft": "0.5 oz"
+        "Gin": "50 ml",
+        "Tonic Water": "150 ml",
+        "Limettensaft": "10 ml"
       }
     },
     {
-      "normal_name": "Margarita",
-      "fun_name": "Citrus Snap",
+      "normal_name": "Cranberry Tequila Sunrise",
+      "fun_name": "Sunset Splash",
       "ingredients": {
-        "Tequila": "2 oz",
-        "Triple Sec": "1 oz",
-        "Limettensaft": "1 oz"
+        "Tequila": "50 ml",
+        "Cranberrysaft": "100 ml",
+        "Grenadinensirup": "10 ml",
+        "Limettensaft": "15 ml"
+      }
+    },
+    {
+      "normal_name": "Citrus Vodka Cooler",
+      "fun_name": "Zesty Breeze",
+      "ingredients": {
+        "Wodka": "40 ml",
+        "Limettensaft": "20 ml",
+        "Orangensaft": "80 ml",
+        "Sprite": "100 ml"
+      }
+    },
+    {
+      "normal_name": "Triple Sec Berry Burst",
+      "fun_name": "Berry Bliss",
+      "ingredients": {
+        "Triple Sec": "30 ml",
+        "Cranberrysaft": "50 ml",
+        "Limettensaft": "20 ml",
+        "Grenadinensirup": "5 ml"
       }
     }
   ]

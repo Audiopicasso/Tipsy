@@ -1,0 +1,88 @@
+{
+  "bottles": {
+    "rum_(weiß)": {
+      "name": "Rum (weiß)",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "wodka": {
+      "name": "Wodka",
+      "capacity_ml": 1000,
+      "current_ml": 800.0,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "gin": {
+      "name": "Gin",
+      "capacity_ml": 600.0,
+      "current_ml": 600.0,
+      "warning_threshold_ml": 120,
+      "critical_threshold_ml": 60
+    },
+    "tequila": {
+      "name": "Tequila",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "pfirsichlikör": {
+      "name": "Pfirsichlikör",
+      "capacity_ml": 1000,
+      "current_ml": 950.0,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "grenadinensirup": {
+      "name": "Grenadinensirup",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "limettensaft": {
+      "name": "Limettensaft",
+      "capacity_ml": 1000,
+      "current_ml": 960.0,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "orangensaft": {
+      "name": "Orangensaft",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "tonic_water": {
+      "name": "Tonic Water",
+      "capacity_ml": 1000,
+      "current_ml": 700.0,
+      "warning_threshold_ml": 800.0,
+      "critical_threshold_ml": 100.0
+    },
+    "sprite": {
+      "name": "Sprite",
+      "capacity_ml": 1000,
+      "current_ml": 700.0,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "triple_sec": {
+      "name": "Triple Sec",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    },
+    "cranberrysaft": {
+      "name": "Cranberrysaft",
+      "capacity_ml": 1000,
+      "current_ml": 1000,
+      "warning_threshold_ml": 200,
+      "critical_threshold_ml": 100
+    }
+  }
+}
