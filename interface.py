@@ -268,7 +268,7 @@ pygame.display.set_caption('Cocktail Swipe')
 
 normal_text_size = 48
 small_text_size = int(normal_text_size * 0.6)
-text_position = (screen_width // 2, int(screen_height * 0.85))
+text_position = (screen_width // 2, int(screen_height * 0.82))
 
 def add_layer(*args, function=screen.blit, key=None):
     if key == None:
