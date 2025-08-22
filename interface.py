@@ -1280,6 +1280,10 @@ def run_interface():
                 swipe_start_pos = event.pos
                 swipe_start_time = pygame.time.get_ticks()
                 
+                # Reset dragging state for clean gesture detection
+                dragging = False
+                drag_offset = 0
+                
                 # Check if drink management tray is clicked
                 if drink_visible and drink_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_drink_management_interaction(drink_ui, event, event.pos)
@@ -1381,8 +1385,11 @@ def run_interface():
                     swipe_distance_y = swipe_end_pos[1] - swipe_start_pos[1]
                     swipe_time = swipe_end_time - swipe_start_time
                     
-                    # Only process swipes that are fast enough (within 500ms) and long enough (>50 pixels)
-                    if swipe_time < 500 and abs(swipe_distance_y) > 50:
+                    # Only process swipes that are fast enough (within 500ms) and long enough (>100 pixels)
+                    # Also check that vertical movement is significantly larger than horizontal movement
+                    if (swipe_time < 500 and 
+                        abs(swipe_distance_y) > 100 and 
+                        abs(swipe_distance_y) > abs(swipe_distance_x) * 1.5):
                         # Check if swipe starts in the correct screen area
                         top_zone = screen_height * 0.1  # Oberstes 10% des Bildschirms
                         bottom_zone = screen_height * 0.9  # Unterstes 10% des Bildschirms
@@ -1432,6 +1439,22 @@ def run_interface():
                     # Clean up swipe tracking variables
                     del swipe_start_pos, swipe_start_time
                 
+                # If no vertical swipe was detected, check for horizontal swipes
+                # This ensures horizontal swipes work even with slight vertical movement
+                
+                # Check if we should process horizontal swipes
+                # Only process if we have a significant horizontal movement
+                if 'swipe_start_pos' in locals():
+                    swipe_distance_x = event.pos[0] - swipe_start_pos[0]
+                    swipe_distance_y = event.pos[1] - swipe_start_pos[1]
+                    
+                    # If horizontal movement is dominant, allow horizontal swiping
+                    if abs(swipe_distance_x) > abs(swipe_distance_y) * 1.2:
+                        # Enable horizontal swiping by setting dragging state
+                        if not dragging:
+                            dragging = True
+                            drag_start_x = swipe_start_pos[0]
+                
                 if slider_dragging:
                     slider_dragging = False
                     continue
@@ -1463,7 +1486,8 @@ def run_interface():
                         drag_offset = 0
                         continue  # Skip further swipe handling.
                     # Otherwise, it's a swipe.
-                    if abs(drag_offset) > screen_width / 4:
+                    # Reduced threshold for more responsive horizontal swiping
+                    if abs(drag_offset) > screen_width / 6:
                         if drag_offset < 0:
                             target_offset = -screen_width
                             new_index = (current_index + 1) % len(cocktails)
@@ -1471,7 +1495,7 @@ def run_interface():
                             target_offset = screen_width
                             new_index = (current_index - 1) % len(cocktails)
                         start_offset = drag_offset
-                        duration = 300
+                        duration = 200  # Faster animation for smoother feel
                         start_time = pygame.time.get_ticks()
                         while True:
                             elapsed = pygame.time.get_ticks() - start_time
@@ -1485,7 +1509,7 @@ def run_interface():
                             draw_frame()
                             if progress >= 1.0:
                                 break
-                            clock.tick(60)
+                            clock.tick(120)  # Higher frame rate for smoother animation
                         current_index = new_index
                         current_cocktail, current_image, current_cocktail_name, previous_image, next_image = load_cocktail(current_index)
 
@@ -1495,7 +1519,7 @@ def run_interface():
                     else:
                         # Animate snapping back if swipe is insufficient.
                         start_offset = drag_offset
-                        duration = 300
+                        duration = 200  # Faster animation for smoother feel
                         start_time = pygame.time.get_ticks()
                         while True:
                             elapsed = pygame.time.get_ticks() - start_time
@@ -1544,7 +1568,7 @@ def run_interface():
                             draw_frame()
                             if progress >= 1.0:
                                 break
-                            clock.tick(60)
+                            clock.tick(120)  # Higher frame rate for smoother animation
                     dragging = False
                     drag_offset = 0
 
@@ -1656,7 +1680,7 @@ def run_interface():
                 pygame.display.flip()  # Update display after drawing dropdowns
                 drink_ui['dropdowns_drawn'] = True
         
-        clock.tick(60)
+        clock.tick(120)  # Higher frame rate for smoother interface
     pygame.quit()
 
 if __name__ == '__main__':
