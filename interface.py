@@ -663,14 +663,10 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         # Slide up from bottom
         start_y = screen_height
         end_y = screen_height - tray_height
-        tab_start_y = settings_tab['base_y']
-        tab_end_y = screen_height - tray_height - settings_tab['height']
     else:
         # Slide down to bottom
         start_y = screen_height - tray_height
         end_y = screen_height
-        tab_start_y = screen_height - tray_height - settings_tab['height']
-        tab_end_y = settings_tab['base_y']
     
     while True:
         elapsed = pygame.time.get_ticks() - start_time
@@ -679,9 +675,7 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         current_y = start_y + (end_y - start_y) * progress
         settings_ui['tray_rect'].y = current_y
         
-        # Update tab position to slide with tray
-        tab_current_y = tab_start_y + (tab_end_y - tab_start_y) * progress
-        settings_tab['rect'].y = tab_current_y
+        # No tab to update anymore
         
         # Update all related positions
         settings_ui['title_rect'].y = current_y + 40
@@ -698,8 +692,7 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         settings_ui['ip_label_rect'].y = current_y + 325
         
         # Update tab layer
-        remove_layer('settings_tab')
-        add_layer(settings_tab['surface'], settings_tab['rect'], key='settings_tab')
+        # No tab layer to update anymore
         
         draw_settings_tray(settings_ui, True)
         draw_frame()
@@ -1037,14 +1030,10 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         # Slide down from top
         start_y = -tray_height
         end_y = 0
-        tab_start_y = drink_tab['base_y']
-        tab_end_y = tray_height - drink_tab['height']
     else:
         # Slide up to top
         start_y = 0
         end_y = -tray_height
-        tab_start_y = tray_height - drink_tab['height']
-        tab_end_y = drink_tab['base_y']
     
     while True:
         elapsed = pygame.time.get_ticks() - start_time
@@ -1053,9 +1042,7 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         current_y = start_y + (end_y - start_y) * progress
         drink_ui['tray_rect'].y = current_y
         
-        # Update tab position to slide with tray
-        tab_current_y = tab_start_y + (tab_end_y - tab_start_y) * progress
-        drink_tab['rect'].y = tab_current_y
+        # No tab to update anymore
         
         # Update all related positions
         # Title position update removed
@@ -1073,9 +1060,7 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         drink_ui['reload_button_rect'].y = current_y + tray_height - 35
         drink_ui['reload_text_rect'].center = drink_ui['reload_button_rect'].center
         
-        # Update tab layer
-        remove_layer('drink_tab')
-        add_layer(drink_tab['surface'], drink_tab['rect'], key='drink_tab')
+        # No tab layer to update anymore
         
         draw_drink_management_tray(drink_ui, True)
         draw_frame()
@@ -1241,26 +1226,16 @@ def run_interface():
     reload_cocktails_rect = None
     reload_logo = None
 
-    # Initialize settings tray and tab
+    # Initialize settings tray (no tab needed)
     settings_ui = create_settings_tray()
-    settings_tab = create_settings_tab()
     settings_visible = False
     slider_dragging = False
-    tab_dragging = False
-    tab_drag_start_y = 0
     
-    # Initialize drink management tray and tab
+    # Initialize drink management tray (no tab needed)
     drink_ui = create_drink_management_tray()
-    drink_tab = create_drink_management_tab()
     drink_visible = False
-    drink_tab_dragging = False
-    drink_tab_drag_start_y = 0
     dropdown_open = None
     generating_menu = False
-    
-    # Add tabs to layers
-    add_layer(settings_tab['surface'], settings_tab['rect'], key='settings_tab')
-    add_layer(drink_tab['surface'], drink_tab['rect'], key='drink_tab')
     
     # Sicherheit: Entferne alle Pump-Labels beim Start
     _force_remove_pump_labels()
@@ -1301,17 +1276,9 @@ def run_interface():
                 if event.key == pygame.K_q:
                     running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                # Check if drink management tab is clicked or dragged
-                if drink_tab['rect'].collidepoint(event.pos):
-                    drink_tab_dragging = True
-                    drink_tab_drag_start_y = event.pos[1]
-                    continue
-                
-                # Check if settings tab is clicked or dragged
-                if settings_tab['rect'].collidepoint(event.pos):
-                    tab_dragging = True
-                    tab_drag_start_y = event.pos[1]
-                    continue
+                # Start tracking for potential swipe gestures
+                swipe_start_pos = event.pos
+                swipe_start_time = pygame.time.get_ticks()
                 
                 # Check if drink management tray is clicked
                 if drink_visible and drink_ui['tray_rect'].collidepoint(event.pos):
@@ -1376,54 +1343,20 @@ def run_interface():
                         remove_layer(f'pump_label_{dropdown["pump_number"]}')
                     # Zusätzliche Sicherheit: Entferne alle Pump-Labels explizit
                     _force_remove_pump_labels()
-                    animate_drink_management_tray(drink_ui, drink_tab, drink_visible)
+                    animate_drink_management_tray(drink_ui, None, drink_visible)
                     continue
                 
                 # If settings is visible and clicked outside, close it
                 if settings_visible:
                     settings_visible = False
-                    animate_settings_tray(settings_ui, settings_tab, settings_visible)
+                    animate_settings_tray(settings_ui, None, settings_visible)
                     continue
                 
                 dragging = True
                 drag_start_x = event.pos[0]
             if event.type == pygame.MOUSEMOTION:
-                if drink_tab_dragging:
-                    # Handle drink tab drag to open/close drink management
-                    current_y = event.pos[1]
-                    drag_distance = drink_tab_drag_start_y - current_y
-                    
-                    # If dragged down enough, open drink management
-                    if drag_distance < -50 and not drink_visible:
-                        drink_visible = True
-                        animate_drink_management_tray(drink_ui, drink_tab, drink_visible)
-                        drink_tab_dragging = False
-                    # If dragged up enough, close drink management  
-                    elif drag_distance > 30 and drink_visible:
-                        drink_visible = False
-                        # Remove all pump labels when closing
-                        for dropdown in drink_ui['dropdowns']:
-                            remove_layer(f'pump_label_{dropdown["pump_number"]}')
-                        # Zusätzliche Sicherheit: Entferne alle Pump-Labels explizit
-                        _force_remove_pump_labels()
-                        animate_drink_management_tray(drink_ui, drink_tab, drink_visible)
-                        drink_tab_dragging = False
-                elif tab_dragging:
-                    # Handle tab drag to open/close settings
-                    current_y = event.pos[1]
-                    drag_distance = tab_drag_start_y - current_y
-                    
-                    # If dragged up enough, open settings
-                    if drag_distance > 50 and not settings_visible:
-                        settings_visible = True
-                        animate_settings_tray(settings_ui, settings_tab, settings_visible)
-                        tab_dragging = False
-                    # If dragged down enough, close settings  
-                    elif drag_distance < -30 and settings_visible:
-                        settings_visible = False
-                        animate_settings_tray(settings_ui, settings_tab, settings_visible)
-                        tab_dragging = False
-                elif slider_dragging:
+                # Tab dragging no longer needed - using swipe gestures instead
+                if slider_dragging:
                     # Update slider based on mouse position
                     mouse_x = event.pos[0]
                     slider_x = settings_ui['slider_x']
@@ -1438,31 +1371,68 @@ def run_interface():
                     current_x = event.pos[0]
                     drag_offset = current_x - drag_start_x
             if event.type == pygame.MOUSEBUTTONUP:
-                if drink_tab_dragging:
-                    # If drink tab was clicked without significant drag, toggle drink management
-                    current_y = event.pos[1]
-                    drag_distance = abs(drink_tab_drag_start_y - current_y)
-                    if drag_distance < 10:  # Minimal movement, treat as click
-                        if drink_visible:
-                            # Remove all pump labels when closing
-                            for dropdown in drink_ui['dropdowns']:
-                                remove_layer(f'pump_label_{dropdown["pump_number"]}')
-                            # Zusätzliche Sicherheit: Entferne alle Pump-Labels explizit
-                            _force_remove_pump_labels()
-                        drink_visible = not drink_visible
-                        animate_drink_management_tray(drink_ui, drink_tab, drink_visible)
-                    drink_tab_dragging = False
-                    continue
-                elif tab_dragging:
-                    # If tab was clicked without significant drag, toggle settings
-                    current_y = event.pos[1]
-                    drag_distance = abs(tab_drag_start_y - current_y)
-                    if drag_distance < 10:  # Minimal movement, treat as click
-                        settings_visible = not settings_visible
-                        animate_settings_tray(settings_ui, settings_tab, settings_visible)
-                    tab_dragging = False
-                    continue
-                elif slider_dragging:
+                # Check for swipe gestures
+                if 'swipe_start_pos' in locals():
+                    swipe_end_pos = event.pos
+                    swipe_end_time = pygame.time.get_ticks()
+                    
+                    # Calculate swipe distance and direction
+                    swipe_distance_x = swipe_end_pos[0] - swipe_start_pos[0]
+                    swipe_distance_y = swipe_end_pos[1] - swipe_start_pos[1]
+                    swipe_time = swipe_end_time - swipe_start_time
+                    
+                    # Only process swipes that are fast enough (within 500ms) and long enough (>50 pixels)
+                    if swipe_time < 500 and abs(swipe_distance_y) > 50:
+                        # Check if swipe starts in the correct screen area
+                        top_zone = screen_height * 0.1  # Oberstes 10% des Bildschirms
+                        bottom_zone = screen_height * 0.9  # Unterstes 10% des Bildschirms
+                        
+                        if swipe_distance_y > 0:  # Swipe down (from top)
+                            # Only open drink management if swipe starts in top 10% of screen
+                            if swipe_start_pos[1] <= top_zone:
+                                # Check if settings is already open - if so, close it first
+                                if settings_visible:
+                                    settings_visible = False
+                                    animate_settings_tray(settings_ui, None, settings_visible)
+                                
+                                # Now open drink management menu (pulldown)
+                                if not drink_visible:
+                                    drink_visible = True
+                                    animate_drink_management_tray(drink_ui, None, drink_visible)
+                                else:
+                                    # Close if already open
+                                    drink_visible = False
+                                    # Remove all pump labels when closing
+                                    for dropdown in drink_ui['dropdowns']:
+                                        remove_layer(f'pump_label_{dropdown["pump_number"]}')
+                                    _force_remove_pump_labels()
+                                    animate_drink_management_tray(drink_ui, None, drink_visible)
+                        elif swipe_distance_y < 0:  # Swipe up (from bottom)
+                            # Only open settings if swipe starts in bottom 10% of screen
+                            if swipe_start_pos[1] >= bottom_zone:
+                                # Check if drink management is already open - if so, close it first
+                                if drink_visible:
+                                    drink_visible = False
+                                    # Remove all pump labels when closing
+                                    for dropdown in drink_ui['dropdowns']:
+                                        remove_layer(f'pump_label_{dropdown["pump_number"]}')
+                                    _force_remove_pump_labels()
+                                    animate_drink_management_tray(drink_ui, None, drink_visible)
+                                
+                                # Now open settings menu (pull-up)
+                                if not settings_visible:
+                                    settings_visible = True
+                                    animate_settings_tray(settings_ui, None, settings_visible)
+                                else:
+                                    # Close if already open
+                                    settings_visible = False
+                                    animate_settings_tray(settings_ui, None, settings_visible)
+                        continue
+                    
+                    # Clean up swipe tracking variables
+                    del swipe_start_pos, swipe_start_time
+                
+                if slider_dragging:
                     slider_dragging = False
                     continue
                 elif dragging:
@@ -1646,30 +1616,7 @@ def run_interface():
                 elif unfavorite_logo:
                     add_layer(unfavorite_logo, favorite_rect, key='favorite_logo')
         
-        # Update tab positions when not animating
-        if not drink_tab_dragging:
-            if drink_visible:
-                # Tab should be at the bottom of the tray
-                drink_tab['rect'].y = drink_ui['tray_rect'].y + drink_ui['tray_rect'].height
-            else:
-                # Tab should be at the top
-                drink_tab['rect'].y = drink_tab['base_y']
-            
-            # Update drink tab layer
-            remove_layer('drink_tab')
-            add_layer(drink_tab['surface'], drink_tab['rect'], key='drink_tab')
-        
-        if not tab_dragging:
-            if settings_visible:
-                # Tab should be at the top of the tray
-                settings_tab['rect'].y = settings_ui['tray_rect'].y - settings_tab['height']
-            else:
-                # Tab should be at the bottom
-                settings_tab['rect'].y = settings_tab['base_y']
-            
-            # Update settings tab layer
-            remove_layer('settings_tab')
-            add_layer(settings_tab['surface'], settings_tab['rect'], key='settings_tab')
+        # No tab positioning needed anymore
         
         # Draw drink management tray if visible
         if drink_visible:
