@@ -3,7 +3,7 @@
     "rum_(weiß)": {
       "name": "Rum (weiß)",
       "capacity_ml": 1000,
-      "current_ml": 1000,
+      "current_ml": 940.0,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
@@ -31,28 +31,28 @@
     "pfirsichlikör": {
       "name": "Pfirsichlikör",
       "capacity_ml": 1000,
-      "current_ml": 950.0,
+      "current_ml": 920.0,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
     "grenadinensirup": {
       "name": "Grenadinensirup",
       "capacity_ml": 1000,
-      "current_ml": 1000,
+      "current_ml": 985.0,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
     "limettensaft": {
       "name": "Limettensaft",
       "capacity_ml": 1000,
-      "current_ml": 960.0,
+      "current_ml": 940.0,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
     "orangensaft": {
       "name": "Orangensaft",
       "capacity_ml": 1000,
-      "current_ml": 1000,
+      "current_ml": 900.0,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
