@@ -71,35 +71,28 @@ def setup_gpio():
 def motor_forward(ia, ib):
     """Drive motor forward."""
     if DEBUG:
-        logger.debug(f'motor_forward(ia={ia}, ib={ib}) called — No actual motor movement.')
+        logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
-        if INVERT_PUMP_PINS:
-            GPIO.output(ia, GPIO.LOW)
-            GPIO.output(ib, GPIO.HIGH)
-        else:
-            GPIO.output(ia, GPIO.HIGH)
-            GPIO.output(ib, GPIO.LOW)
+        GPIO.output(ia, GPIO.HIGH)
+        GPIO.output(ib, GPIO.LOW)
 
 
 def motor_stop(ia, ib):
     """Stop motor."""
     if DEBUG:
-        logger.debug(f'motor_stop(ia={ia}, ib={ib}) called — No actual motor movement.')
+        logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
         GPIO.output(ia, GPIO.LOW)
         GPIO.output(ib, GPIO.LOW)
 
 
 def motor_reverse(ia,ib):
+    """Drive motor in reverse."""
     if DEBUG:
-        logger.debug(f'motor_reverse(ia={ia}, ib={ib}) called — No actual motor movement.')
+        logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
-        if INVERT_PUMP_PINS:
-            GPIO.output(ia,GPIO.HIGH)
-            GPIO.output(ib,GPIO.LOW)
-        else:
-            GPIO.output(ia,GPIO.LOW)
-            GPIO.output(ib,GPIO.HIGH)
+        GPIO.output(ia,GPIO.LOW)
+        GPIO.output(ib,GPIO.HIGH)
 
 
 class Pour:
@@ -116,19 +109,23 @@ class Pour:
         self.running = True
         ia, ib = MOTORS[self.pump_index]
         
-        # Berechne Pumpzeit basierend auf ML_COEFFICIENT
-        seconds_to_pour = self.amount * ML_COEFFICIENT
+        # Verwende pumpenspezifischen Kalibrierungskoeffizienten
+        pump_number = self.pump_index + 1  # pump_index ist 0-basiert, aber wir brauchen 1-basierte Nummer
+        pump_coefficient = get_pump_coefficient(pump_number)
+        
+        # Berechne Pumpzeit basierend auf pumpenspezifischem Koeffizienten
+        seconds_to_pour = self.amount * pump_coefficient
 
         if RETRACTION_TIME:
             logger.debug(f'Retraction time is set to {RETRACTION_TIME:.2f} seconds. Adding this time to pour time')
             seconds_to_pour = seconds_to_pour + RETRACTION_TIME
 
-        logger.info(f'Pouring {self.amount} ml of Pump {self.pump_index} for {seconds_to_pour:.2f} seconds.')
+        logger.info(f'Pouring {self.amount} ml of Pump {pump_number} (Type: {"Peristaltic" if pump_number in PERISTALTIC_PUMPS else "Membrane"}) for {seconds_to_pour:.2f} seconds using coefficient {pump_coefficient:.4f}.')
         motor_forward(ia, ib)
         time.sleep(seconds_to_pour)
 
         if RETRACTION_TIME:
-            logger.info(f'Retracting Pump {self.pump_index} for {RETRACTION_TIME:.2f} seconds')
+            logger.info(f'Retracting Pump {pump_number} for {RETRACTION_TIME:.2f} seconds')
             motor_reverse(ia, ib)
             time.sleep(RETRACTION_TIME)
 

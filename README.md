@@ -177,7 +177,62 @@ Several settings can be configured via environment variables, or in a .env file.
 * RELOAD_COCKTAILS_TIMEOUT: Set to a number of milliseconds to automatically reload the list of cocktails that often.
 * RETRACTION_TIME: Set to a number of seconds to reverse the motors at the end of a pour. This should help prevent buildup on the ends of the tubing.
 * USE_GPT_TRANSPARENCY: Set to 'true' to enable native image transparency in OpenAI. This should produce more consistent image results. This uses the `gpt-image-1` model. Your organization must be verified to use the model `gpt-image-1`. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization. If you just verified, it can take up to 15 minutes for access to propagate.
-* COCKTAIL_IMAGE_SCALE: The size (as a decimal, ie. 0.75 for 75%) you want to scale the cocktail images to, relative to the screen size. Defaults to 1.0, or full screen.
+
+---
+
+## Pump Calibration
+
+The Tipsy Cocktail Mixer features **two different pump types** that require independent calibration:
+
+### Pump Types
+- **Peristaltic Pumps (1-6)**: Very thin tubing, slower flow rate, suitable for spirits and syrups
+- **Membrane Pumps (7-12)**: Thicker tubing, faster flow rate, suitable for juices and carbonated beverages
+
+### Calibration Methods
+
+#### 1. Web Interface (Streamlit)
+Access the Settings tab in the Streamlit app to:
+- Set separate calibration coefficients for each pump type
+- View current calibration values
+- Use the calibration calculator for precise adjustments
+- Test individual pumps
+
+#### 2. Command Line Tool
+Use the dedicated pump test tool for direct control:
+```bash
+python pump_test.py
+```
+
+**Features:**
+- Interactive pump testing and calibration
+- Individual pump control (forward/reverse)
+- Calibration test with automatic coefficient calculation
+- Pump priming and cleaning functions
+- Real-time pump status monitoring
+
+### Calibration Process
+1. **Prepare**: Place a measuring cup under the pump and note the starting level
+2. **Test**: Run the pump for a known duration (e.g., 10 seconds)
+3. **Measure**: Measure the pumped volume in ml
+4. **Calculate**: Calculate time for 50ml: `Time = (Test_Time × 50ml) ÷ Pumped_ml`
+5. **Input**: Enter the calculated value in the appropriate field
+6. **Save**: Click the save button to update the calibration
+
+**Example**: If a pump delivers 25ml in 10 seconds:
+- Time for 50ml = (10s × 50ml) ÷ 25ml = 20 seconds
+- Input: 20.0 seconds
+
+### Calibration Coefficients
+- **PERISTALTIC_ML_COEFFICIENT**: Seconds per ml for peristaltic pumps (1-6)
+- **MEMBRANE_ML_COEFFICIENT**: Seconds per ml for membrane pumps (7-12)
+- **ML_COEFFICIENT**: Legacy setting (replaced by specific coefficients)
+
+### Tips for Accurate Calibration
+- Perform calibration tests with different durations for consistency
+- Test each pump multiple times for reliable results
+- Consider fluid viscosity and temperature effects
+- Recalibrate after changing tubing or pump components
+- Use the same fluid type for calibration as intended for operation
 
 ---
 

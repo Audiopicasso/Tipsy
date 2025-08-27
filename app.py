@@ -387,46 +387,378 @@ with tabs[0]:
 with tabs[1]:
     st.title("Settings")
 
-    st.subheader("Pump Calibration")
-    st.info("💡 Konfiguriere hier, wie lange eine Pumpe laufen muss, um 50ml zu pumpen")
+    st.subheader("🔧 Pumpenkalibrierung")
+    st.info("💡 Konfiguriere hier die Kalibrierung für beide Pumpentypen unabhängig voneinander")
     
-    # ML-Koeffizient Konfiguration
-    ml_coefficient = st.number_input(
-        "Sekunden für 50ml",
-        min_value=1.0,
-        max_value=60.0,
-        value=8.0,
-        step=0.5,
-        help="Wie viele Sekunden braucht eine Pumpe, um 50ml zu pumpen?"
-    )
+    # Erstelle zwei Spalten für die verschiedenen Pumpentypen
+    col1, col2 = st.columns(2)
     
-    if st.button("💾 Kalibrierung speichern", use_container_width=True):
-        try:
-            # Lade aktuelle Settings
-            settings_file = Path("settings.py")
-            if settings_file.exists():
-                with open(settings_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+    with col1:
+        st.markdown("### 🌀 Peristaltische Pumpen (Pumpen 1-6)")
+        st.info("Diese Pumpen haben sehr dünne Schläuche und pumpen typischerweise langsamer")
+        
+        # Peristaltische Pumpen Kalibrierung
+        peristaltic_ml_coefficient = st.number_input(
+            "Sekunden für 50ml (Peristaltisch)",
+            min_value=1.0,
+            max_value=120.0,
+            value=12.0,
+            step=0.5,
+            help="Wie viele Sekunden brauchen die peristaltischen Pumpen (1-6), um 50ml zu pumpen?",
+            key="peristaltic_ml_coefficient_input"
+        )
+        
+        # Berechne den Koeffizienten
+        peristaltic_coefficient = peristaltic_ml_coefficient / 50.0  # Sekunden pro ml
+        st.metric(
+            "Kalibrierungskoeffizient", 
+            f"{peristaltic_coefficient:.4f} s/ml",
+            help="Sekunden pro Milliliter für peristaltische Pumpen"
+        )
+        
+        if st.button("💾 Peristaltische Pumpen speichern", use_container_width=True, key="save_peristaltic_button"):
+            try:
+                # Lade aktuelle Settings
+                settings_file = Path("settings.py")
+                if settings_file.exists():
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Ersetze PERISTALTIC_ML_COEFFICIENT
+                    if "PERISTALTIC_ML_COEFFICIENT" in content:
+                        # Suche nach der aktuellen Zeile und ersetze sie
+                        import re
+                        pattern = r'PERISTALTIC_ML_COEFFICIENT = \d+\.?\d*'
+                        replacement = f'PERISTALTIC_ML_COEFFICIENT = {peristaltic_coefficient:.4f}'
+                        content = re.sub(pattern, replacement, content)
+                        
+                        with open(settings_file, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        
+                        st.success(f"✅ Peristaltische Pumpen-Kalibrierung gespeichert: {peristaltic_ml_coefficient}s für 50ml ({peristaltic_coefficient:.4f}s/ml)")
+                    else:
+                        st.warning("⚠️ PERISTALTIC_ML_COEFFICIENT nicht in settings.py gefunden")
+            except Exception as e:
+                st.error(f"❌ Fehler beim Speichern der Kalibrierung: {e}")
+    
+    with col2:
+        st.markdown("### 💨 Membranpumpen (Pumpen 7-12)")
+        st.info("Diese Pumpen haben dickere Schläuche und pumpen typischerweise schneller")
+        
+        # Membranpumpen Kalibrierung
+        membrane_ml_coefficient = st.number_input(
+            "Sekunden für 50ml (Membran)",
+            min_value=1.0,
+            max_value=120.0,
+            value=6.0,
+            step=0.5,
+            help="Wie viele Sekunden brauchen die Membranpumpen (7-12), um 50ml zu pumpen?",
+            key="membrane_ml_coefficient_input"
+        )
+        
+        # Berechne den Koeffizienten
+        membrane_coefficient = membrane_ml_coefficient / 50.0  # Sekunden pro ml
+        st.metric(
+            "Kalibrierungskoeffizient", 
+            f"{membrane_coefficient:.4f} s/ml",
+            help="Sekunden pro Milliliter für Membranpumpen"
+        )
+        
+        if st.button("💾 Membranpumpen speichern", use_container_width=True, key="save_membrane_button"):
+            try:
+                # Lade aktuelle Settings
+                settings_file = Path("settings.py")
+                if settings_file.exists():
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Ersetze MEMBRANE_ML_COEFFICIENT
+                    if "MEMBRANE_ML_COEFFICIENT" in content:
+                        # Suche nach der aktuellen Zeile und ersetze sie
+                        import re
+                        pattern = r'MEMBRANE_ML_COEFFICIENT = \d+\.?\d*'
+                        replacement = f'MEMBRANE_ML_COEFFICIENT = {membrane_coefficient:.4f}'
+                        content = re.sub(pattern, replacement, content)
+                        
+                        with open(settings_file, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        
+                        st.success(f"✅ Membranpumpen-Kalibrierung gespeichert: {membrane_ml_coefficient}s für 50ml ({membrane_coefficient:.4f}s/ml)")
+                    else:
+                        st.warning("⚠️ MEMBRANE_ML_COEFFICIENT nicht in settings.py gefunden")
+            except Exception as e:
+                st.error(f"❌ Fehler beim Speichern der Kalibrierung: {e}")
+    
+    # Aktuelle Kalibrierung anzeigen
+    st.markdown("---")
+    st.markdown("### 📊 Aktuelle Kalibrierungswerte")
+    
+    try:
+        # Lade aktuelle Werte aus settings.py
+        settings_file = Path("settings.py")
+        if settings_file.exists():
+            with open(settings_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Extrahiere aktuelle Werte mit Regex
+            import re
+            
+            peristaltic_match = re.search(r'PERISTALTIC_ML_COEFFICIENT = (\d+\.?\d*)', content)
+            membrane_match = re.search(r'MEMBRANE_ML_COEFFICIENT = (\d+\.?\d*)', content)
+            
+            if peristaltic_match and membrane_match:
+                current_peristaltic = float(peristaltic_match.group(1))
+                current_membrane = float(membrane_match.group(1))
                 
-                # Ersetze OZ_COEFFICIENT durch ML_COEFFICIENT
-                if "OZ_COEFFICIENT" in content:
-                    # Berechne den neuen Koeffizienten (50ml = 1.69 oz)
-                    new_coefficient = ml_coefficient / 50.0  # Sekunden pro ml
-                    content = content.replace(
-                        "OZ_COEFFICIENT = 8.0",
-                        f"ML_COEFFICIENT = {new_coefficient:.4f}  # Sekunden pro ml"
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric(
+                        "Peristaltische Pumpen (1-6)",
+                        f"{current_peristaltic * 50:.1f}s für 50ml",
+                        f"{current_peristaltic:.4f} s/ml"
                     )
-                    
-                    with open(settings_file, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    
-                    st.success(f"✅ Kalibrierung gespeichert: {ml_coefficient}s für 50ml ({new_coefficient:.4f}s/ml)")
-                else:
-                    st.warning("⚠️ OZ_COEFFICIENT nicht in settings.py gefunden")
-        except Exception as e:
-            st.error(f"❌ Fehler beim Speichern der Kalibrierung: {e}")
+                
+                with col2:
+                    st.metric(
+                        "Membranpumpen (7-12)",
+                        f"{current_membrane * 50:.1f}s für 50ml",
+                        f"{current_membrane:.4f} s/ml"
+                    )
+                
+                with col3:
+                    difference = abs(current_peristaltic - current_membrane)
+                    st.metric(
+                        "Unterschied",
+                        f"{difference:.4f} s/ml",
+                        "zwischen Pumpentypen"
+                    )
+            else:
+                st.warning("⚠️ Aktuelle Kalibrierungswerte konnten nicht gelesen werden")
+    except Exception as e:
+        st.error(f"❌ Fehler beim Lesen der aktuellen Kalibrierung: {e}")
+    
+    # Kalibrierungshilfe
+    st.markdown("---")
+    st.markdown("### 🎯 Kalibrierungshilfe")
+    
+    with st.expander("📖 Wie kalibriere ich meine Pumpen?"):
+        st.markdown("""
+        **Schritt-für-Schritt Anleitung:**
+        
+        1. **Vorbereitung**: Stelle einen Messbecher unter die Pumpe und notiere den Startstand
+        2. **Testlauf**: Starte die Pumpe für eine bekannte Zeit (z.B. 10 Sekunden)
+        3. **Messung**: Miss die gepumpte Menge in ml
+        4. **Berechnung**: Berechne die Zeit für 50ml: `Zeit = (10s × 50ml) ÷ gepumpte_ml`
+        5. **Eingabe**: Gib den berechneten Wert in das entsprechende Feld ein
+        6. **Speichern**: Klicke auf den Speichern-Button
+        
+        **Beispiel**: Wenn eine Pumpe in 10 Sekunden 25ml pumpt:
+        - Zeit für 50ml = (10s × 50ml) ÷ 25ml = 20 Sekunden
+        - Eingabe: 20.0 Sekunden
+        """)
+    
+    with st.expander("🔍 Pumpentypen unterscheiden"):
+        st.markdown("""
+        **Peristaltische Pumpen (1-6):**
+        - Sehr dünne Schläuche
+        - Langsamere Durchflussrate
+        - Geeignet für Spirituosen und Sirupe
+        
+        **Membranpumpen (7-12):**
+        - Dickere Schläuche
+        - Schnellere Durchflussrate
+        - Geeignet für Säfte und kohlensäurehaltige Getränke
+        """)
 
     st.subheader("Prime Pumps")
+    
+    # Einzelpumpen-Test für Kalibrierung
+    st.markdown("---")
+    st.markdown("### 🧪 Einzelpumpen-Test für Kalibrierung")
+    st.info("Teste einzelne Pumpen, um die Kalibrierung zu verfeinern")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Teste peristaltische Pumpe")
+        peristaltic_test_pump = st.selectbox(
+            "Wähle Pumpe",
+            options=[1, 2, 3, 4, 5, 6],
+            help="Wähle eine peristaltische Pumpe zum Testen",
+            key="peristaltic_test_pump_select"
+        )
+        
+        peristaltic_test_duration = st.number_input(
+            "Testdauer (Sekunden)",
+            min_value=1.0,
+            max_value=30.0,
+            value=5.0,
+            step=0.5,
+            help="Wie lange soll die Pumpe laufen?",
+            key="peristaltic_test_duration"
+        )
+        
+        if st.button("▶️ Peristaltische Pumpe testen", use_container_width=True, key="peristaltic_test_button"):
+            st.info(f"🔄 Teste Pumpe {peristaltic_test_pump} für {peristaltic_test_duration} Sekunden...")
+            st.info("📝 Miss die gepumpte Menge und berechne die Zeit für 50ml")
+            
+            # Berechne erwartete Menge basierend auf aktueller Kalibrierung
+            try:
+                settings_file = Path("settings.py")
+                if settings_file.exists():
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    import re
+                    peristaltic_match = re.search(r'PERISTALTIC_ML_COEFFICIENT = (\d+\.?\d*)', content)
+                    if peristaltic_match:
+                        current_coefficient = float(peristaltic_match.group(1))
+                        expected_ml = peristaltic_test_duration / current_coefficient
+                        st.success(f"📊 Erwartete Menge: {expected_ml:.1f}ml")
+                        st.info(f"💡 Bei {expected_ml:.1f}ml in {peristaltic_test_duration}s → Zeit für 50ml = {(peristaltic_test_duration * 50) / expected_ml:.1f}s")
+            except Exception as e:
+                st.error(f"❌ Fehler beim Berechnen der erwarteten Menge: {e}")
+    
+    with col2:
+        st.markdown("#### Teste Membranpumpe")
+        membrane_test_pump = st.selectbox(
+            "Wähle Pumpe",
+            options=[7, 8, 9, 10, 11, 12],
+            help="Wähle eine Membranpumpe zum Testen",
+            key="membrane_test_pump_select"
+        )
+        
+        membrane_test_duration = st.number_input(
+            "Testdauer (Sekunden)",
+            min_value=1.0,
+            max_value=30.0,
+            value=5.0,
+            step=0.5,
+            help="Wie lange soll die Pumpe laufen?",
+            key="membrane_test_duration"
+        )
+        
+        if st.button("▶️ Membranpumpe testen", use_container_width=True, key="membrane_test_button"):
+            st.info(f"🔄 Teste Pumpe {membrane_test_pump} für {membrane_test_duration} Sekunden...")
+            st.info("📝 Miss die gepumpte Menge und berechne die Zeit für 50ml")
+            
+            # Berechne erwartete Menge basierend auf aktueller Kalibrierung
+            try:
+                settings_file = Path("settings.py")
+                if settings_file.exists():
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    import re
+                    membrane_match = re.search(r'MEMBRANE_ML_COEFFICIENT = (\d+\.?\d*)', content)
+                    if membrane_match:
+                        current_coefficient = float(membrane_match.group(1))
+                        expected_ml = membrane_test_duration / current_coefficient
+                        st.success(f"📊 Erwartete Menge: {expected_ml:.1f}ml")
+                        st.info(f"💡 Bei {expected_ml:.1f}ml in {membrane_test_duration}s → Zeit für 50ml = {(membrane_test_duration * 50) / expected_ml:.1f}s")
+            except Exception as e:
+                st.error(f"❌ Fehler beim Berechnen der erwarteten Menge: {e}")
+    
+    # Kalibrierungsrechner
+    st.markdown("---")
+    st.markdown("### 🧮 Kalibrierungsrechner")
+    st.info("Berechne die optimale Kalibrierung basierend auf Ihren Testmessungen")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Peristaltische Pumpe")
+        peristaltic_test_time = st.number_input(
+            "Testdauer (Sekunden)",
+            min_value=1.0,
+            max_value=60.0,
+            value=10.0,
+            step=0.5,
+            key="peristaltic_calc_time"
+        )
+        
+        peristaltic_test_ml = st.number_input(
+            "Gepumpte Menge (ml)",
+            min_value=0.1,
+            max_value=100.0,
+            value=20.0,
+            step=0.1,
+            key="peristaltic_calc_ml"
+        )
+        
+        if peristaltic_test_time > 0 and peristaltic_test_ml > 0:
+            peristaltic_time_for_50ml = (peristaltic_test_time * 50) / peristaltic_test_ml
+            peristaltic_coefficient_calc = peristaltic_test_time / peristaltic_test_ml
+            
+            st.success(f"⏱️ Zeit für 50ml: {peristaltic_time_for_50ml:.1f} Sekunden")
+            st.info(f"🔧 Koeffizient: {peristaltic_coefficient_calc:.4f} s/ml")
+            
+            if st.button("💾 Peristaltische Kalibrierung übernehmen", use_container_width=True):
+                try:
+                    settings_file = Path("settings.py")
+                    if settings_file.exists():
+                        with open(settings_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        import re
+                        pattern = r'PERISTALTIC_ML_COEFFICIENT = \d+\.?\d*'
+                        replacement = f'PERISTALTIC_ML_COEFFICIENT = {peristaltic_coefficient_calc:.4f}'
+                        content = re.sub(pattern, replacement, content)
+                        
+                        with open(settings_file, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        
+                        st.success(f"✅ Peristaltische Kalibrierung aktualisiert: {peristaltic_time_for_50ml:.1f}s für 50ml")
+                except Exception as e:
+                    st.error(f"❌ Fehler beim Speichern: {e}")
+    
+    with col2:
+        st.markdown("#### Membranpumpe")
+        membrane_test_time = st.number_input(
+            "Testdauer (Sekunden)",
+            min_value=1.0,
+            max_value=60.0,
+            value=10.0,
+            step=0.5,
+            key="membrane_calc_time"
+        )
+        
+        membrane_test_ml = st.number_input(
+            "Gepumpte Menge (ml)",
+            min_value=0.1,
+            max_value=100.0,
+            value=40.0,
+            step=0.1,
+            key="membrane_calc_ml"
+        )
+        
+        if membrane_test_time > 0 and membrane_test_ml > 0:
+            membrane_time_for_50ml = (membrane_test_time * 50) / membrane_test_ml
+            membrane_coefficient_calc = membrane_test_time / membrane_test_ml
+            
+            st.success(f"⏱️ Zeit für 50ml: {membrane_time_for_50ml:.1f} Sekunden")
+            st.info(f"🔧 Koeffizient: {membrane_coefficient_calc:.4f} s/ml")
+            
+            if st.button("💾 Membranpumpe-Kalibrierung übernehmen", use_container_width=True):
+                try:
+                    settings_file = Path("settings.py")
+                    if settings_file.exists():
+                        with open(settings_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        import re
+                        pattern = r'MEMBRANE_ML_COEFFICIENT = \d+\.?\d*'
+                        replacement = f'MEMBRANE_ML_COEFFICIENT = {membrane_coefficient_calc:.4f}'
+                        content = re.sub(pattern, replacement, content)
+                        
+                        with open(settings_file, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        
+                        st.success(f"✅ Membranpumpe-Kalibrierung aktualisiert: {membrane_time_for_50ml:.1f}s für 50ml")
+                except Exception as e:
+                    st.error(f"❌ Fehler beim Speichern: {e}")
+
     if st.button("Prime Pumps", use_container_width=True):
         st.info("Priming all pumps for 10 seconds each...")
         try:
