@@ -9,8 +9,6 @@ import concurrent.futures
 
 from settings import *
 from bottle_monitor import bottle_monitor
-from gpio_lock import GPIOLock
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # GPIO-Initialisierung mit gpiozero
 if not DEBUG:
@@ -64,83 +62,23 @@ MOTORS = [
     (15, 14),  # Pump 12
 ]
 
-"""Motor-Controller werden on-demand erstellt und sofort wieder freigegeben.
-Wir halten nur während eines aktiven Laufes Referenzen in-memory.
-"""
-active_devices = {}
-lock_held = False
-gpio_lock = GPIOLock()
-OWNER_FILE = os.path.join(BASE_DIR, 'gpio_owner.txt')
-PROCESS_ROLE = os.getenv('TIPSY_PROCESS', 'interface')
+# Motor-Controller werden erst bei Bedarf erstellt
+motor_controllers_a = None
+motor_controllers_b = None
 
-def _read_gpio_owner() -> str:
-    try:
-        if os.path.exists(OWNER_FILE):
-            with open(OWNER_FILE, 'r', encoding='utf-8') as f:
-                return f.read().strip().lower()
-    except Exception:
-        pass
-    # Standardmäßig gehört die GPIO-Steuerung der Oberfläche (interface)
-    return 'interface'
-
-def _get_or_create_devices(pump_index):
-    """Gibt (dev_a, dev_b) für die Pumpe zurück; erstellt sie falls nötig."""
-    if pump_index in active_devices:
-        return active_devices[pump_index]
-    ia, ib = MOTORS[pump_index]
-    dev_a = DigitalOutputDevice(ia)
-    dev_b = DigitalOutputDevice(ib)
-    active_devices[pump_index] = (dev_a, dev_b)
-    return dev_a, dev_b
-
-def _close_devices(pump_index):
-    pair = active_devices.pop(pump_index, None)
-    if not pair:
-        return
-    dev_a, dev_b = pair
-    try:
-        dev_a.off(); dev_b.off()
-    except Exception:
-        pass
-    try:
-        dev_a.close(); dev_b.close()
-    except Exception:
-        pass
-
-def _acquire_gpio_or_raise():
-    """Versucht exklusiven Zugriff auf GPIO zu bekommen und prüft Besitzrecht per Toggle-Datei."""
-    global lock_held
-    if DEBUG:
-        return
-    owner = _read_gpio_owner()
-    if owner not in ('interface', 'streamlit'):
-        owner = 'interface'
-    if owner != PROCESS_ROLE:
-        raise RuntimeError(f'GPIO an {owner} vergeben – bitte Toggle in Streamlit ändern')
-    # Versuche Lock zu bekommen
-    if not lock_held:
-        if not gpio_lock.acquire():
-            raise RuntimeError('GPIO busy')
-        lock_held = True
-
-def _release_gpio_if_held():
-    """Gibt Lock und Controller frei, falls gehalten."""
-    global lock_held
-    if DEBUG:
-        return
-    _release_motor_controllers()
-    if lock_held:
-        try:
-            gpio_lock.release()
-        finally:
-            lock_held = False
+def _init_motor_controllers():
+    """Initialisiert die Motor-Controller nur wenn nötig"""
+    global motor_controllers_a, motor_controllers_b
+    if motor_controllers_a is None and not DEBUG:
+        motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
+        motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
 
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
     if DEBUG:
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
-        _acquire_gpio_or_raise()
+        _init_motor_controllers()
         logger.debug('GPIO pins initialized with gpiozero')
 
 def motor_forward(ia, ib):
@@ -148,10 +86,11 @@ def motor_forward(ia, ib):
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
+        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                dev_a, dev_b = _get_or_create_devices(i)
-                dev_a.on(); dev_b.off()
+                motor_controllers_a[i].on()
+                motor_controllers_b[i].off()
                 break
 
 def motor_stop(ia, ib):
@@ -159,11 +98,11 @@ def motor_stop(ia, ib):
     if DEBUG:
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
+        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                dev_a, dev_b = _get_or_create_devices(i)
-                dev_a.off(); dev_b.off()
-                _close_devices(i)
+                motor_controllers_a[i].off()
+                motor_controllers_b[i].off()
                 break
 
 def motor_reverse(ia, ib):
@@ -171,10 +110,11 @@ def motor_reverse(ia, ib):
     if DEBUG:
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
+        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                dev_a, dev_b = _get_or_create_devices(i)
-                dev_a.off(); dev_b.on()
+                motor_controllers_a[i].off()
+                motor_controllers_b[i].on()
                 break
 
 class Pour:
@@ -227,7 +167,8 @@ def prime_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            _release_gpio_if_held()
+            # GPIO cleanup not needed with gpiozero
+            pass
         else:
             logger.debug('prime_pumps() complete — no GPIO cleanup in debug mode.')
 
@@ -245,7 +186,8 @@ def clean_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            _release_gpio_if_held()
+            # GPIO cleanup not needed with gpiozero
+            pass
         else:
             logger.debug('clean_pumps() complete no GPIO cleanup in debug mode.')
 
@@ -345,7 +287,8 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
 
     if not DEBUG:
-        _release_gpio_if_held()
+        # GPIO cleanup not needed with gpiozero
+        pass
     else:
         logger.debug('pour_ingredients() complete — no GPIO cleanup in debug mode.')
 

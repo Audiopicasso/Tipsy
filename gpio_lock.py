@@ -12,26 +12,15 @@ class GPIOLock:
         self.lock_fd = None
     
     def acquire(self, timeout=5):
-        """Versuche GPIO-Lock zu erhalten (mit Timeout in Sekunden)."""
-        start = time.time()
-        # Öffne/erstelle Lock-Datei
-        if self.lock_fd is None:
-            try:
-                self.lock_fd = os.open(self.lock_file, os.O_CREAT | os.O_WRONLY)
-            except Exception:
-                self.lock_fd = None
-                return False
-        # Versuche Exklusiv-Lock wiederholt bis Timeout
-        while True:
-            try:
-                fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                logger.debug("GPIO-Lock erhalten")
-                return True
-            except (OSError, IOError):
-                if time.time() - start >= max(0, float(timeout)):
-                    logger.warning("GPIO-Lock Timeout — weiterhin belegt")
-                    return False
-                time.sleep(0.1)
+        """Versuche GPIO-Lock zu erhalten"""
+        try:
+            self.lock_fd = os.open(self.lock_file, os.O_CREAT | os.O_WRONLY)
+            fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            logger.debug("GPIO-Lock erhalten")
+            return True
+        except (OSError, IOError):
+            logger.warning("GPIO bereits in Verwendung, warte...")
+            return False
     
     def release(self):
         """GPIO-Lock freigeben"""

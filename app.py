@@ -13,9 +13,6 @@ from settings import *
 from helpers import *
 from bottle_monitor import bottle_monitor
 
-# Rolle dieses Prozesses bekannt machen (für GPIO-Exklusivität)
-os.environ.setdefault('TIPSY_PROCESS', 'streamlit')
-
 # Import your controller module
 import controller
 
@@ -389,36 +386,6 @@ with tabs[0]:
 # ================ TAB 2: Settings ================
 with tabs[1]:
     st.title("Settings")
-
-    # ===================== GPIO Ownership Toggle =====================
-    st.subheader("GPIO-Steuerung")
-    from pathlib import Path as _Path
-    OWNER_FILE = str((_Path(__file__).parent / "gpio_owner.txt").resolve())
-    current_owner = "interface"
-    try:
-        if os.path.exists(OWNER_FILE):
-            with open(OWNER_FILE, "r", encoding="utf-8") as f:
-                current_owner = (f.read().strip() or "interface").lower()
-    except Exception:
-        current_owner = "interface"
-
-    owner_map = {"Interface": "interface", "Streamlit": "streamlit"}
-    owner_label = "Streamlit" if current_owner == "streamlit" else "Interface"
-    chosen_label = st.radio(
-        "Wer kontrolliert die Pumpen?",
-        options=["Interface", "Streamlit"],
-        index=0 if owner_label == "Interface" else 1,
-        help="Schalte auf 'Streamlit', um Kalibrierung/Tests hier durchzuführen. Danach zurück auf 'Interface' stellen."
-    )
-    chosen_owner = owner_map[chosen_label]
-    if chosen_owner != current_owner:
-        try:
-            with open(OWNER_FILE, "w", encoding="utf-8") as f:
-                f.write(chosen_owner)
-            st.success(f"GPIO-Steuerung gesetzt auf: {chosen_label}")
-        except Exception as e:
-            st.error(f"Konnte GPIO-Steuerung nicht setzen: {e}")
-    st.caption("Aktuell: " + ("Streamlit" if chosen_owner == "streamlit" else "Interface"))
 
     st.subheader("🔧 Pumpenkalibrierung")
     st.info("💡 Konfiguriere hier die Kalibrierung für beide Pumpentypen unabhängig voneinander")

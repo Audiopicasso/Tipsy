@@ -9,7 +9,7 @@ import os
 from settings import (
     DEBUG, COCKTAILS_FILE, LOGO_FOLDER, ML_COEFFICIENT, 
     RETRACTION_TIME, PUMP_CONCURRENCY, INVERT_PUMP_PINS, 
-    FULL_SCREEN, COCKTAIL_IMAGE_SCALE, OPENAI_API_KEY
+    FULL_SCREEN, COCKTAIL_IMAGE_SCALE
 )
 
 # Configuration flags
@@ -18,17 +18,6 @@ SHOW_RELOAD_COCKTAILS_BUTTON = True  # Show/hide reload cocktails button
 RELOAD_COCKTAILS_TIMEOUT = None  # Auto-reload timeout (None = disabled)
 CONFIG_FILE = "pump_config.json"  # Pump configuration file
 from helpers import get_cocktail_image_path, get_valid_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
-import os
-os.environ.setdefault('TIPSY_PROCESS', 'interface')
-# Setze Owner-Datei explizit in Projekt-Ordner
-try:
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    owner_file = os.path.join(base_dir, 'gpio_owner.txt')
-    if not os.path.exists(owner_file):
-        with open(owner_file, 'w', encoding='utf-8') as f:
-            f.write('interface')
-except Exception:
-    pass
 from controller import make_drink
 
 import logging
@@ -239,13 +228,6 @@ def create_qr_code_slide():
     }
     
     return qr_cocktail
-
-def _current_gpio_owner():
-    try:
-        with open(owner_file, 'r', encoding='utf-8') as f:
-            return (f.read().strip() or 'interface').lower()
-    except Exception:
-        return 'interface'
 
 def get_cocktails_with_qr():
     """Get valid cocktails and add QR code slide at the end"""
@@ -1485,23 +1467,18 @@ def run_interface():
                             if single_logo:
                                 animate_logo_click(single_logo, single_rect, base_size=150, target_size=220, layer_key='single_logo', duration=150)
 
-                            # Blockiere Zapfen, wenn Streamlit die GPIO-Steuerung hat
-                            if _current_gpio_owner() != 'interface':
-                                logger.info('Zapfen über Interface blockiert: GPIO-Owner = Streamlit')
-                            else:
-                                executor_watcher = make_drink(current_cocktail, 'single')
-                                show_pouring_and_loading(watcher=executor_watcher)
+                            executor_watcher = make_drink(current_cocktail, 'single')
+
+                            show_pouring_and_loading(watcher=executor_watcher)
 
                         elif double_rect.collidepoint(pos):
                             # Animate double logo click
                             if double_logo:
                                 animate_logo_click(double_logo, double_rect, base_size=150, target_size=220, layer_key='double_logo', duration=150)
 
-                            if _current_gpio_owner() != 'interface':
-                                logger.info('Zapfen über Interface blockiert: GPIO-Owner = Streamlit')
-                            else:
-                                executor_watcher = make_drink(current_cocktail, 'double')
-                                show_pouring_and_loading(executor_watcher)
+                            executor_watcher = make_drink(current_cocktail, 'double')
+
+                            show_pouring_and_loading(executor_watcher)
                     
                         # Favoriten- und Reload-Buttons sind jetzt im Drink Management Menü
                             
