@@ -240,6 +240,13 @@ def create_qr_code_slide():
     
     return qr_cocktail
 
+def _current_gpio_owner():
+    try:
+        with open(owner_file, 'r', encoding='utf-8') as f:
+            return (f.read().strip() or 'interface').lower()
+    except Exception:
+        return 'interface'
+
 def get_cocktails_with_qr():
     """Get valid cocktails and add QR code slide at the end"""
     cocktails = get_valid_cocktails()
@@ -1478,18 +1485,23 @@ def run_interface():
                             if single_logo:
                                 animate_logo_click(single_logo, single_rect, base_size=150, target_size=220, layer_key='single_logo', duration=150)
 
-                            executor_watcher = make_drink(current_cocktail, 'single')
-
-                            show_pouring_and_loading(watcher=executor_watcher)
+                            # Blockiere Zapfen, wenn Streamlit die GPIO-Steuerung hat
+                            if _current_gpio_owner() != 'interface':
+                                logger.info('Zapfen über Interface blockiert: GPIO-Owner = Streamlit')
+                            else:
+                                executor_watcher = make_drink(current_cocktail, 'single')
+                                show_pouring_and_loading(watcher=executor_watcher)
 
                         elif double_rect.collidepoint(pos):
                             # Animate double logo click
                             if double_logo:
                                 animate_logo_click(double_logo, double_rect, base_size=150, target_size=220, layer_key='double_logo', duration=150)
 
-                            executor_watcher = make_drink(current_cocktail, 'double')
-
-                            show_pouring_and_loading(executor_watcher)
+                            if _current_gpio_owner() != 'interface':
+                                logger.info('Zapfen über Interface blockiert: GPIO-Owner = Streamlit')
+                            else:
+                                executor_watcher = make_drink(current_cocktail, 'double')
+                                show_pouring_and_loading(executor_watcher)
                     
                         # Favoriten- und Reload-Buttons sind jetzt im Drink Management Menü
                             

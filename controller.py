@@ -64,9 +64,10 @@ MOTORS = [
     (15, 14),  # Pump 12
 ]
 
-# Motor-Controller werden erst bei Bedarf erstellt
-motor_controllers_a = None
-motor_controllers_b = None
+"""Motor-Controller werden on-demand erstellt und sofort wieder freigegeben.
+Wir halten nur während eines aktiven Laufes Referenzen in-memory.
+"""
+active_devices = {}
 lock_held = False
 gpio_lock = GPIOLock()
 OWNER_FILE = os.path.join(BASE_DIR, 'gpio_owner.txt')
@@ -82,40 +83,29 @@ def _read_gpio_owner() -> str:
     # Standardmäßig gehört die GPIO-Steuerung der Oberfläche (interface)
     return 'interface'
 
-def _init_motor_controllers():
-    """Initialisiert die Motor-Controller nur wenn nötig"""
-    global motor_controllers_a, motor_controllers_b
-    if motor_controllers_a is None and not DEBUG:
-        motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
-        motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
+def _get_or_create_devices(pump_index):
+    """Gibt (dev_a, dev_b) für die Pumpe zurück; erstellt sie falls nötig."""
+    if pump_index in active_devices:
+        return active_devices[pump_index]
+    ia, ib = MOTORS[pump_index]
+    dev_a = DigitalOutputDevice(ia)
+    dev_b = DigitalOutputDevice(ib)
+    active_devices[pump_index] = (dev_a, dev_b)
+    return dev_a, dev_b
 
-def _release_motor_controllers():
-    """Schließt alle Motor-Controller und gibt Ressourcen frei."""
-    global motor_controllers_a, motor_controllers_b
+def _close_devices(pump_index):
+    pair = active_devices.pop(pump_index, None)
+    if not pair:
+        return
+    dev_a, dev_b = pair
     try:
-        if motor_controllers_a:
-            for d in motor_controllers_a:
-                try:
-                    d.off()
-                except Exception:
-                    pass
-                try:
-                    d.close()
-                except Exception:
-                    pass
-        if motor_controllers_b:
-            for d in motor_controllers_b:
-                try:
-                    d.off()
-                except Exception:
-                    pass
-                try:
-                    d.close()
-                except Exception:
-                    pass
-    finally:
-        motor_controllers_a = None
-        motor_controllers_b = None
+        dev_a.off(); dev_b.off()
+    except Exception:
+        pass
+    try:
+        dev_a.close(); dev_b.close()
+    except Exception:
+        pass
 
 def _acquire_gpio_or_raise():
     """Versucht exklusiven Zugriff auf GPIO zu bekommen und prüft Besitzrecht per Toggle-Datei."""
@@ -151,7 +141,6 @@ def setup_gpio():
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
         _acquire_gpio_or_raise()
-        _init_motor_controllers()
         logger.debug('GPIO pins initialized with gpiozero')
 
 def motor_forward(ia, ib):
@@ -159,11 +148,10 @@ def motor_forward(ia, ib):
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].on()
-                motor_controllers_b[i].off()
+                dev_a, dev_b = _get_or_create_devices(i)
+                dev_a.on(); dev_b.off()
                 break
 
 def motor_stop(ia, ib):
@@ -171,11 +159,11 @@ def motor_stop(ia, ib):
     if DEBUG:
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].off()
+                dev_a, dev_b = _get_or_create_devices(i)
+                dev_a.off(); dev_b.off()
+                _close_devices(i)
                 break
 
 def motor_reverse(ia, ib):
@@ -183,11 +171,10 @@ def motor_reverse(ia, ib):
     if DEBUG:
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
         for i, (motor_ia, motor_ib) in enumerate(MOTORS):
             if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].on()
+                dev_a, dev_b = _get_or_create_devices(i)
+                dev_a.off(); dev_b.on()
                 break
 
 class Pour:
