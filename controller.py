@@ -10,12 +10,18 @@ import concurrent.futures
 from settings import *
 from bottle_monitor import bottle_monitor
 
+# GPIO-Initialisierung mit gpiozero
 if not DEBUG:
     try:
-        import RPi.GPIO as GPIO
+        from gpiozero import DigitalOutputDevice
+        logger.info('gpiozero erfolgreich geladen - Pi 5 kompatibel')
     except ModuleNotFoundError:
         DEBUG = True
         logger.info('Controller modules not found. Pump control will be disabled')
+    except Exception as e:
+        DEBUG = True
+        logger.error(f'GPIO-Initialisierung fehlgeschlagen: {e}')
+        logger.info('Pump control will be disabled')
 
 # Ingredient Mapping: Cocktail-Zutaten zu Flaschen-IDs
 INGREDIENT_MAPPING = {
@@ -56,44 +62,60 @@ MOTORS = [
     (15, 14),  # Pump 12
 ]
 
+# Motor-Controller werden erst bei Bedarf erstellt
+motor_controllers_a = None
+motor_controllers_b = None
+
+def _init_motor_controllers():
+    """Initialisiert die Motor-Controller nur wenn nötig"""
+    global motor_controllers_a, motor_controllers_b
+    if motor_controllers_a is None and not DEBUG:
+        motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
+        motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
 
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
     if DEBUG:
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
-        GPIO.setmode(GPIO.BCM)
-        for ia, ib in MOTORS:
-            GPIO.setup(ia, GPIO.OUT)
-            GPIO.setup(ib, GPIO.OUT)
-
+        _init_motor_controllers()
+        logger.debug('GPIO pins initialized with gpiozero')
 
 def motor_forward(ia, ib):
     """Drive motor forward."""
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
-        GPIO.output(ia, GPIO.HIGH)
-        GPIO.output(ib, GPIO.LOW)
-
+        _init_motor_controllers()
+        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+            if motor_ia == ia and motor_ib == ib:
+                motor_controllers_a[i].on()
+                motor_controllers_b[i].off()
+                break
 
 def motor_stop(ia, ib):
     """Stop motor."""
     if DEBUG:
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
-        GPIO.output(ia, GPIO.LOW)
-        GPIO.output(ib, GPIO.LOW)
+        _init_motor_controllers()
+        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+            if motor_ia == ia and motor_ib == ib:
+                motor_controllers_a[i].off()
+                motor_controllers_b[i].off()
+                break
 
-
-def motor_reverse(ia,ib):
+def motor_reverse(ia, ib):
     """Drive motor in reverse."""
     if DEBUG:
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
-        GPIO.output(ia,GPIO.LOW)
-        GPIO.output(ib,GPIO.HIGH)
-
+        _init_motor_controllers()
+        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+            if motor_ia == ia and motor_ib == ib:
+                motor_controllers_a[i].off()
+                motor_controllers_b[i].on()
+                break
 
 class Pour:
     def __str__(self):
@@ -108,11 +130,11 @@ class Pour:
     def run(self):
         self.running = True
         ia, ib = MOTORS[self.pump_index]
-        
+
         # Verwende pumpenspezifischen Kalibrierungskoeffizienten
         pump_number = self.pump_index + 1  # pump_index ist 0-basiert, aber wir brauchen 1-basierte Nummer
         pump_coefficient = get_pump_coefficient(pump_number)
-        
+
         # Berechne Pumpzeit basierend auf pumpenspezifischem Koeffizienten
         seconds_to_pour = self.amount * pump_coefficient
 
@@ -132,7 +154,6 @@ class Pour:
         motor_stop(ia, ib)
         self.running = False
 
-
 def prime_pumps(duration=10):
     """
     Primes each pump for `duration` seconds in sequence (one after another).
@@ -146,10 +167,10 @@ def prime_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            GPIO.cleanup()
+            # GPIO cleanup not needed with gpiozero
+            pass
         else:
             logger.debug('prime_pumps() complete — no GPIO cleanup in debug mode.')
-
 
 def clean_pumps(duration=10):
     """
@@ -165,10 +186,10 @@ def clean_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            GPIO.cleanup()
+            # GPIO cleanup not needed with gpiozero
+            pass
         else:
             logger.debug('clean_pumps() complete no GPIO cleanup in debug mode.')
-
 
 class ExecutorWatcher:
 
@@ -181,13 +202,12 @@ class ExecutorWatcher:
             return False
         return True
 
-
 def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher):
     executor = concurrent.futures.ThreadPoolExecutor()
     executor_watcher = ExecutorWatcher()
     factor = 2 if single_or_double.lower() == 'double' else 1
     index = 1
-    
+
     # Überprüfe zuerst alle Flaschen-Füllstände
     ingredients_to_pour = []
     for ingredient_name, measurement_str in sorted(ingredients.items(), key=lambda x: x[1], reverse=True):
@@ -202,25 +222,26 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
             continue
 
         ml_needed = ml_amount * factor
-        
+
         # Überprüfe Flaschen-Füllstand
         # Verwende das Ingredient Mapping, um die korrekte Flaschen-ID zu finden
         ingredient_key = ingredient_name.lower().strip()
         bottle_id = INGREDIENT_MAPPING.get(ingredient_key, ingredient_key.replace(' ', '_'))
-        
+
         logger.info(f'Überprüfe Flasche: {ingredient_name} -> ingredient_key: {ingredient_key} -> bottle_id: {bottle_id}, benötigt: {ml_needed:.1f}ml')
-        
+
         if not bottle_monitor.consume_liquid(bottle_id, ml_needed):
             logger.error(f'Flasche {ingredient_name} (ID: {bottle_id}) hat nicht genug Flüssigkeit für {ml_needed:.1f}ml')
             # Stoppe alle Pumpen und gebe Fehler zurück
             if not DEBUG:
-                GPIO.cleanup()
+                # GPIO cleanup not needed with gpiozero
+                pass
             return None
         else:
             logger.info(f'Flasche {ingredient_name} (ID: {bottle_id}) hat genug Flüssigkeit. Verbraucht: {ml_needed:.1f}ml')
-            
+
         ingredients_to_pour.append((ingredient_name, ml_needed))
-    
+
     # Jetzt alle Zutaten ausgeben
     for ingredient_name, ml_needed in ingredients_to_pour:
         # find a matching pump label in pump_config
@@ -257,19 +278,19 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
 
     while not executor_watcher.done():
         pass
-    
+
     # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
     logger.info("Cocktail-Zubereitung abgeschlossen - synchronisiere Flaschen-Status")
     try:
         logger.info("Alle Flaschen sind nach Cocktail-Zubereitung konsistent")
     except Exception as e:
         logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
-    
+
     if not DEBUG:
-        GPIO.cleanup()
+        # GPIO cleanup not needed with gpiozero
+        pass
     else:
         logger.debug('pour_ingredients() complete — no GPIO cleanup in debug mode.')
-        
 
 def make_drink(recipe, single_or_double="single"):
     """
