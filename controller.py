@@ -193,14 +193,13 @@ def prime_pumps(duration=10):
         _init_motor_controllers()
         logger.info('GPIO erfolgreich initialisiert für Prime-Pumps')
         
-        try:
-            for index, (ia, ib) in enumerate(MOTORS, start=1):
-                logger.info(f'Priming pump {index} for {duration} seconds...')
-                motor_forward(ia, ib)
-                time.sleep(duration)
-                motor_stop(ia, ib)
-        finally:
-            pass
+        for index, (ia, ib) in enumerate(MOTORS, start=1):
+            logger.info(f'Priming pump {index} for {duration} seconds...')
+            motor_forward(ia, ib)
+            time.sleep(duration)
+            motor_stop(ia, ib)
+    finally:
+        pass
 
 def clean_pumps(duration=10):
     """
@@ -219,14 +218,13 @@ def clean_pumps(duration=10):
         _init_motor_controllers()
         logger.info('GPIO erfolgreich initialisiert für Clean-Pumps')
         
-        try:
-            for index, (ia, ib) in enumerate(MOTORS, start=1):
-                logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
-                motor_reverse(ia, ib)
-                time.sleep(duration)
-                motor_stop(ia, ib)
-        finally:
-            pass
+        for index, (ia, ib) in enumerate(MOTORS, start=1):
+            logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
+            motor_reverse(ia, ib)
+            time.sleep(duration)
+            motor_stop(ia, ib)
+    finally:
+        pass
 
 class ExecutorWatcher:
 
