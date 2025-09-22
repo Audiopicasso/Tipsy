@@ -10,20 +10,21 @@ logger = logging.getLogger(__name__)
 from settings import *
 from bottle_monitor import bottle_monitor
 
-# GPIO-Pins für Pumpen
+# GPIO-Pins für Pumpen - Verwende die gleichen Pins wie das Interface
+# Aber mit direkter GPIO-Methode statt gpiozero
 MOTORS = [
-    (17, 4),   # Pump 1
-    (22, 27),  # Pump 2
-    (9, 10),   # Pump 3
-    (5, 11),   # Pump 4
-    (13, 6),   # Pump 5
-    (26, 19),  # Pump 6
-    (20, 21),  # Pump 7
-    (16, 12),  # Pump 8
-    (7, 8),    # Pump 9
-    (25, 24),  # Pump 10
-    (23, 18),  # Pump 11
-    (15, 14),  # Pump 12
+    (17, 4),   # Pump 1 - Gleiche Pins wie Interface
+    (22, 27),  # Pump 2 - Gleiche Pins wie Interface
+    (9, 10),   # Pump 3 - Gleiche Pins wie Interface
+    (5, 11),   # Pump 4 - Gleiche Pins wie Interface
+    (13, 6),   # Pump 5 - Gleiche Pins wie Interface
+    (26, 19),  # Pump 6 - Gleiche Pins wie Interface
+    (20, 21),  # Pump 7 - Gleiche Pins wie Interface
+    (16, 12),  # Pump 8 - Gleiche Pins wie Interface
+    (7, 8),    # Pump 9 - Gleiche Pins wie Interface
+    (25, 24),  # Pump 10 - Gleiche Pins wie Interface
+    (23, 18),  # Pump 11 - Gleiche Pins wie Interface
+    (15, 14),  # Pump 12 - Gleiche Pins wie Interface
 ]
 
 def _gpio_export(pin):
