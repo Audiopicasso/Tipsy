@@ -9,6 +9,7 @@ import concurrent.futures
 
 from settings import *
 from bottle_monitor import bottle_monitor
+from gpio_lock import GPIOLock
 
 # GPIO-Initialisierung mit gpiozero
 if not DEBUG:
@@ -78,44 +79,61 @@ def setup_gpio():
     if DEBUG:
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
-        _init_motor_controllers()
-        logger.debug('GPIO pins initialized with gpiozero')
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                logger.debug('GPIO pins initialized with gpiozero')
+            else:
+                logger.warning('GPIO nicht verfügbar - bereits in Verwendung')
+                raise Exception("GPIO busy")
 
 def motor_forward(ia, ib):
     """Drive motor forward."""
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].on()
-                motor_controllers_b[i].off()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].on()
+                        motor_controllers_b[i].off()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_forward')
 
 def motor_stop(ia, ib):
     """Stop motor."""
     if DEBUG:
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].off()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].off()
+                        motor_controllers_b[i].off()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_stop')
 
 def motor_reverse(ia, ib):
     """Drive motor in reverse."""
     if DEBUG:
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].on()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].off()
+                        motor_controllers_b[i].on()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_reverse')
 
 class Pour:
     def __str__(self):
@@ -158,38 +176,52 @@ def prime_pumps(duration=10):
     """
     Primes each pump for `duration` seconds in sequence (one after another).
     """
-    setup_gpio()
-    try:
-        for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Priming pump {index} for {duration} seconds...')
-            motor_forward(ia, ib)
-            time.sleep(duration)
-            motor_stop(ia, ib)
-    finally:
-        if not DEBUG:
-            # GPIO cleanup not needed with gpiozero
+    if DEBUG:
+        logger.info(f'DEBUG: Would prime pumps for {duration} seconds')
+        return
+    
+    with GPIOLock() as lock_acquired:
+        if not lock_acquired:
+            logger.error("GPIO nicht verfügbar - Prime Pumps abgebrochen")
+            raise Exception("GPIO busy")
+        
+        _init_motor_controllers()
+        logger.info('GPIO erfolgreich initialisiert für Prime-Pumps')
+        
+        try:
+            for index, (ia, ib) in enumerate(MOTORS, start=1):
+                logger.info(f'Priming pump {index} for {duration} seconds...')
+                motor_forward(ia, ib)
+                time.sleep(duration)
+                motor_stop(ia, ib)
+        finally:
             pass
-        else:
-            logger.debug('prime_pumps() complete — no GPIO cleanup in debug mode.')
 
 def clean_pumps(duration=10):
     """
     Reverse each pump for `duration` seconds (one after another),
     e.g. for cleaning lines.
     """
-    setup_gpio()
-    try:
-        for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
-            motor_reverse(ia, ib)
-            time.sleep(duration)
-            motor_stop(ia, ib)
-    finally:
-        if not DEBUG:
-            # GPIO cleanup not needed with gpiozero
+    if DEBUG:
+        logger.info(f'DEBUG: Would clean pumps for {duration} seconds')
+        return
+    
+    with GPIOLock() as lock_acquired:
+        if not lock_acquired:
+            logger.error("GPIO nicht verfügbar - Clean Pumps abgebrochen")
+            raise Exception("GPIO busy")
+        
+        _init_motor_controllers()
+        logger.info('GPIO erfolgreich initialisiert für Clean-Pumps')
+        
+        try:
+            for index, (ia, ib) in enumerate(MOTORS, start=1):
+                logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
+                motor_reverse(ia, ib)
+                time.sleep(duration)
+                motor_stop(ia, ib)
+        finally:
             pass
-        else:
-            logger.debug('clean_pumps() complete no GPIO cleanup in debug mode.')
 
 class ExecutorWatcher:
 
