@@ -4,7 +4,6 @@ import time
 import os
 import json
 import concurrent.futures
-from gpiozero import DigitalOutputDevice
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +26,50 @@ MOTORS = [
     (15, 14),  # Pump 12
 ]
 
+def _gpio_export(pin):
+    """Export GPIO pin"""
+    try:
+        with open(f'/sys/class/gpio/export', 'w') as f:
+            f.write(str(pin))
+    except:
+        pass  # Pin bereits exportiert
+
+def _gpio_unexport(pin):
+    """Unexport GPIO pin"""
+    try:
+        with open(f'/sys/class/gpio/unexport', 'w') as f:
+            f.write(str(pin))
+    except:
+        pass
+
+def _gpio_set_direction(pin, direction):
+    """Set GPIO direction (in/out)"""
+    try:
+        with open(f'/sys/class/gpio/gpio{pin}/direction', 'w') as f:
+            f.write(direction)
+    except:
+        pass
+
+def _gpio_set_value(pin, value):
+    """Set GPIO value (0/1)"""
+    try:
+        with open(f'/sys/class/gpio/gpio{pin}/value', 'w') as f:
+            f.write(str(value))
+    except:
+        pass
+
 def motor_forward(ia, ib):
     """Drive motor forward."""
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
         try:
-            pin_a = DigitalOutputDevice(ia)
-            pin_b = DigitalOutputDevice(ib)
-            pin_a.on()
-            pin_b.off()
-            time.sleep(0.1)  # Kurz warten
-            pin_a.close()
-            pin_b.close()
+            _gpio_export(ia)
+            _gpio_export(ib)
+            _gpio_set_direction(ia, 'out')
+            _gpio_set_direction(ib, 'out')
+            _gpio_set_value(ia, 1)
+            _gpio_set_value(ib, 0)
         except Exception as e:
             logger.error(f'Fehler motor_forward: {e}')
             raise Exception("GPIO busy")
@@ -50,13 +80,12 @@ def motor_stop(ia, ib):
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
         try:
-            pin_a = DigitalOutputDevice(ia)
-            pin_b = DigitalOutputDevice(ib)
-            pin_a.off()
-            pin_b.off()
-            time.sleep(0.1)  # Kurz warten
-            pin_a.close()
-            pin_b.close()
+            _gpio_export(ia)
+            _gpio_export(ib)
+            _gpio_set_direction(ia, 'out')
+            _gpio_set_direction(ib, 'out')
+            _gpio_set_value(ia, 0)
+            _gpio_set_value(ib, 0)
         except Exception as e:
             logger.error(f'Fehler motor_stop: {e}')
             raise Exception("GPIO busy")
@@ -67,13 +96,12 @@ def motor_reverse(ia, ib):
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
         try:
-            pin_a = DigitalOutputDevice(ia)
-            pin_b = DigitalOutputDevice(ib)
-            pin_a.off()
-            pin_b.on()
-            time.sleep(0.1)  # Kurz warten
-            pin_a.close()
-            pin_b.close()
+            _gpio_export(ia)
+            _gpio_export(ib)
+            _gpio_set_direction(ia, 'out')
+            _gpio_set_direction(ib, 'out')
+            _gpio_set_value(ia, 0)
+            _gpio_set_value(ib, 1)
         except Exception as e:
             logger.error(f'Fehler motor_reverse: {e}')
             raise Exception("GPIO busy")
@@ -90,6 +118,9 @@ def prime_pumps(duration=10):
             motor_forward(ia, ib)
             time.sleep(duration)
             motor_stop(ia, ib)
+            # GPIO-Pins freigeben
+            _gpio_unexport(ia)
+            _gpio_unexport(ib)
     except Exception as e:
         logger.error(f'Prime Pumps Fehler: {e}')
         raise Exception("GPIO busy")
@@ -106,6 +137,9 @@ def clean_pumps(duration=10):
             motor_reverse(ia, ib)
             time.sleep(duration)
             motor_stop(ia, ib)
+            # GPIO-Pins freigeben
+            _gpio_unexport(ia)
+            _gpio_unexport(ib)
     except Exception as e:
         logger.error(f'Clean Pumps Fehler: {e}')
         raise Exception("GPIO busy")
