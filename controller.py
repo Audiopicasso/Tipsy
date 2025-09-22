@@ -79,6 +79,9 @@ def _init_motor_controllers():
 
 def is_gpio_available():
     """Prüft, ob GPIO verfügbar ist"""
+    # Erzwinge GPIO-Cleanup vor der Prüfung
+    force_gpio_cleanup()
+    
     try:
         # Versuche einen Test-Pin zu erstellen
         test_pin = DigitalOutputDevice(2)  # GPIO 2 ist meist verfügbar
@@ -88,20 +91,36 @@ def is_gpio_available():
         logger.debug(f'GPIO nicht verfügbar: {e}')
         return False
 
-def _cleanup_motor_controllers():
-    """Räumt die Motor-Controller auf"""
+def force_gpio_cleanup():
+    """Erzwingt die Freigabe aller GPIO-Pins"""
     global motor_controllers_a, motor_controllers_b
+    
+    # Schließe alle Controller
     if motor_controllers_a is not None:
         try:
             for controller in motor_controllers_a:
                 controller.close()
+        except:
+            pass
+        motor_controllers_a = None
+    
+    if motor_controllers_b is not None:
+        try:
             for controller in motor_controllers_b:
                 controller.close()
-            motor_controllers_a = None
-            motor_controllers_b = None
-            logger.debug('Motor-Controller aufgeräumt')
-        except Exception as e:
-            logger.error(f'Fehler beim Aufräumen der Motor-Controller: {e}')
+        except:
+            pass
+        motor_controllers_b = None
+    
+    # Warte kurz, damit GPIO freigegeben wird
+    import time
+    time.sleep(0.1)
+    
+    logger.debug('GPIO-Force-Cleanup durchgeführt')
+
+def _cleanup_motor_controllers():
+    """Räumt die Motor-Controller auf"""
+    force_gpio_cleanup()
 
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
