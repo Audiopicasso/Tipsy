@@ -70,8 +70,12 @@ def _init_motor_controllers():
     """Initialisiert die Motor-Controller nur wenn nötig"""
     global motor_controllers_a, motor_controllers_b
     if motor_controllers_a is None and not DEBUG:
-        motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
-        motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
+        try:
+            motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
+            motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
+        except Exception as e:
+            logger.error(f'Fehler beim Initialisieren der Motor-Controller: {e}')
+            raise e
 
 def is_gpio_available():
     """Prüft, ob GPIO verfügbar ist"""
@@ -83,6 +87,21 @@ def is_gpio_available():
     except Exception as e:
         logger.debug(f'GPIO nicht verfügbar: {e}')
         return False
+
+def _cleanup_motor_controllers():
+    """Räumt die Motor-Controller auf"""
+    global motor_controllers_a, motor_controllers_b
+    if motor_controllers_a is not None:
+        try:
+            for controller in motor_controllers_a:
+                controller.close()
+            for controller in motor_controllers_b:
+                controller.close()
+            motor_controllers_a = None
+            motor_controllers_b = None
+            logger.debug('Motor-Controller aufgeräumt')
+        except Exception as e:
+            logger.error(f'Fehler beim Aufräumen der Motor-Controller: {e}')
 
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
@@ -199,7 +218,7 @@ def prime_pumps(duration=10):
             time.sleep(duration)
             motor_stop(ia, ib)
     finally:
-        pass
+        _cleanup_motor_controllers()
 
 def clean_pumps(duration=10):
     """
@@ -224,7 +243,7 @@ def clean_pumps(duration=10):
             time.sleep(duration)
             motor_stop(ia, ib)
     finally:
-        pass
+        _cleanup_motor_controllers()
 
 class ExecutorWatcher:
 
@@ -315,17 +334,7 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         pass
 
     # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
-    logger.info("Cocktail-Zubereitung abgeschlossen - synchronisiere Flaschen-Status")
-    try:
-        logger.info("Alle Flaschen sind nach Cocktail-Zubereitung konsistent")
-    except Exception as e:
-        logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
-
-    if not DEBUG:
-        # GPIO cleanup not needed with gpiozero
-        pass
-    else:
-        logger.debug('pour_ingredients() complete — no GPIO cleanup in debug mode.')
+    logger.info("Cocktail-Zubereitung abgeschlossen")
 
 def make_drink(recipe, single_or_double="single"):
     """
@@ -353,9 +362,14 @@ def make_drink(recipe, single_or_double="single"):
         logger.critical('No ingredients found in recipe.')
         return
 
-    setup_gpio()
-    executor = concurrent.futures.ThreadPoolExecutor()
-    executor_watcher = ExecutorWatcher()
-    executor_watcher.executors.append(executor.submit(pour_ingredients, ingredients, single_or_double, pump_config, executor_watcher))
+    # 3) Initialisiere GPIO nur für diese Cocktail-Zubereitung
+    try:
+        setup_gpio()
+        executor = concurrent.futures.ThreadPoolExecutor()
+        executor_watcher = ExecutorWatcher()
+        executor_watcher.executors.append(executor.submit(pour_ingredients, ingredients, single_or_double, pump_config, executor_watcher))
 
-    return executor_watcher
+        return executor_watcher
+    finally:
+        # GPIO nach Cocktail-Zubereitung freigeben
+        _cleanup_motor_controllers()
