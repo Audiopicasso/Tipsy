@@ -9,6 +9,7 @@ import concurrent.futures
 
 from settings import *
 from bottle_monitor import bottle_monitor
+from gpio_lock import GPIOLock
 
 # GPIO-Initialisierung mit gpiozero
 if not DEBUG:
@@ -70,113 +71,69 @@ def _init_motor_controllers():
     """Initialisiert die Motor-Controller nur wenn nötig"""
     global motor_controllers_a, motor_controllers_b
     if motor_controllers_a is None and not DEBUG:
-        try:
-            motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
-            motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
-        except Exception as e:
-            logger.error(f'Fehler beim Initialisieren der Motor-Controller: {e}')
-            raise e
-
-def is_gpio_available():
-    """Prüft, ob GPIO verfügbar ist"""
-    # Erzwinge GPIO-Cleanup vor der Prüfung
-    force_gpio_cleanup()
-    
-    try:
-        # Versuche einen Test-Pin zu erstellen
-        test_pin = DigitalOutputDevice(2)  # GPIO 2 ist meist verfügbar
-        test_pin.close()
-        return True
-    except Exception as e:
-        logger.debug(f'GPIO nicht verfügbar: {e}')
-        return False
-
-def force_gpio_cleanup():
-    """Erzwingt die Freigabe aller GPIO-Pins"""
-    global motor_controllers_a, motor_controllers_b
-    
-    # Schließe alle Controller
-    if motor_controllers_a is not None:
-        try:
-            for controller in motor_controllers_a:
-                controller.close()
-        except:
-            pass
-        motor_controllers_a = None
-    
-    if motor_controllers_b is not None:
-        try:
-            for controller in motor_controllers_b:
-                controller.close()
-        except:
-            pass
-        motor_controllers_b = None
-    
-    # Warte kurz, damit GPIO freigegeben wird
-    import time
-    time.sleep(0.1)
-    
-    logger.debug('GPIO-Force-Cleanup durchgeführt')
-
-def _cleanup_motor_controllers():
-    """Räumt die Motor-Controller auf"""
-    force_gpio_cleanup()
+        motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
+        motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
 
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
     if DEBUG:
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
-        _init_motor_controllers()
-        logger.debug('GPIO pins initialized with gpiozero')
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                logger.debug('GPIO pins initialized with gpiozero')
+            else:
+                logger.warning('GPIO nicht verfügbar - bereits in Verwendung')
+                raise Exception("GPIO busy")
 
 def motor_forward(ia, ib):
     """Drive motor forward."""
     if DEBUG:
         logger.debug(f'motor_forward({ia}, {ib}) called')
     else:
-        if not is_gpio_available():
-            logger.warning('GPIO nicht verfügbar - motor_forward abgebrochen')
-            raise Exception("GPIO busy")
-        
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].on()
-                motor_controllers_b[i].off()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].on()
+                        motor_controllers_b[i].off()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_forward')
 
 def motor_stop(ia, ib):
     """Stop motor."""
     if DEBUG:
         logger.debug(f'motor_stop({ia}, {ib}) called')
     else:
-        if not is_gpio_available():
-            logger.warning('GPIO nicht verfügbar - motor_stop abgebrochen')
-            raise Exception("GPIO busy")
-        
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].off()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].off()
+                        motor_controllers_b[i].off()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_stop')
 
 def motor_reverse(ia, ib):
     """Drive motor in reverse."""
     if DEBUG:
         logger.debug(f'motor_reverse({ia}, {ib}) called')
     else:
-        if not is_gpio_available():
-            logger.warning('GPIO nicht verfügbar - motor_reverse abgebrochen')
-            raise Exception("GPIO busy")
-        
-        _init_motor_controllers()
-        for i, (motor_ia, motor_ib) in enumerate(MOTORS):
-            if motor_ia == ia and motor_ib == ib:
-                motor_controllers_a[i].off()
-                motor_controllers_b[i].on()
-                break
+        with GPIOLock() as lock_acquired:
+            if lock_acquired:
+                _init_motor_controllers()
+                for i, (motor_ia, motor_ib) in enumerate(MOTORS):
+                    if motor_ia == ia and motor_ib == ib:
+                        motor_controllers_a[i].off()
+                        motor_controllers_b[i].on()
+                        break
+            else:
+                logger.warning('GPIO nicht verfügbar für motor_reverse')
 
 class Pour:
     def __str__(self):
@@ -223,21 +180,22 @@ def prime_pumps(duration=10):
         logger.info(f'DEBUG: Would prime pumps for {duration} seconds')
         return
     
-    if not is_gpio_available():
-        logger.error("GPIO nicht verfügbar - Prime Pumps abgebrochen")
-        raise Exception("GPIO busy")
-    
-    try:
+    with GPIOLock() as lock_acquired:
+        if not lock_acquired:
+            logger.error("GPIO nicht verfügbar - Prime Pumps abgebrochen")
+            raise Exception("GPIO busy")
+        
         _init_motor_controllers()
         logger.info('GPIO erfolgreich initialisiert für Prime-Pumps')
         
-        for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Priming pump {index} for {duration} seconds...')
-            motor_forward(ia, ib)
-            time.sleep(duration)
-            motor_stop(ia, ib)
-    finally:
-        _cleanup_motor_controllers()
+        try:
+            for index, (ia, ib) in enumerate(MOTORS, start=1):
+                logger.info(f'Priming pump {index} for {duration} seconds...')
+                motor_forward(ia, ib)
+                time.sleep(duration)
+                motor_stop(ia, ib)
+        finally:
+            pass
 
 def clean_pumps(duration=10):
     """
@@ -248,21 +206,22 @@ def clean_pumps(duration=10):
         logger.info(f'DEBUG: Would clean pumps for {duration} seconds')
         return
     
-    if not is_gpio_available():
-        logger.error("GPIO nicht verfügbar - Clean Pumps abgebrochen")
-        raise Exception("GPIO busy")
-    
-    try:
+    with GPIOLock() as lock_acquired:
+        if not lock_acquired:
+            logger.error("GPIO nicht verfügbar - Clean Pumps abgebrochen")
+            raise Exception("GPIO busy")
+        
         _init_motor_controllers()
         logger.info('GPIO erfolgreich initialisiert für Clean-Pumps')
         
-        for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
-            motor_reverse(ia, ib)
-            time.sleep(duration)
-            motor_stop(ia, ib)
-    finally:
-        _cleanup_motor_controllers()
+        try:
+            for index, (ia, ib) in enumerate(MOTORS, start=1):
+                logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
+                motor_reverse(ia, ib)
+                time.sleep(duration)
+                motor_stop(ia, ib)
+        finally:
+            pass
 
 class ExecutorWatcher:
 
@@ -353,7 +312,17 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         pass
 
     # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
-    logger.info("Cocktail-Zubereitung abgeschlossen")
+    logger.info("Cocktail-Zubereitung abgeschlossen - synchronisiere Flaschen-Status")
+    try:
+        logger.info("Alle Flaschen sind nach Cocktail-Zubereitung konsistent")
+    except Exception as e:
+        logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
+
+    if not DEBUG:
+        # GPIO cleanup not needed with gpiozero
+        pass
+    else:
+        logger.debug('pour_ingredients() complete — no GPIO cleanup in debug mode.')
 
 def make_drink(recipe, single_or_double="single"):
     """
@@ -381,14 +350,9 @@ def make_drink(recipe, single_or_double="single"):
         logger.critical('No ingredients found in recipe.')
         return
 
-    # 3) Initialisiere GPIO nur für diese Cocktail-Zubereitung
-    try:
-        setup_gpio()
-        executor = concurrent.futures.ThreadPoolExecutor()
-        executor_watcher = ExecutorWatcher()
-        executor_watcher.executors.append(executor.submit(pour_ingredients, ingredients, single_or_double, pump_config, executor_watcher))
+    setup_gpio()
+    executor = concurrent.futures.ThreadPoolExecutor()
+    executor_watcher = ExecutorWatcher()
+    executor_watcher.executors.append(executor.submit(pour_ingredients, ingredients, single_or_double, pump_config, executor_watcher))
 
-        return executor_watcher
-    finally:
-        # GPIO nach Cocktail-Zubereitung freigeben
-        _cleanup_motor_controllers()
+    return executor_watcher

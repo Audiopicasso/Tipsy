@@ -13,8 +13,8 @@ from settings import *
 from helpers import *
 from bottle_monitor import bottle_monitor
 
-# Import your controller module - verwende Streamlit-spezifischen Controller
-import controller_streamlit as controller
+# Import your controller module
+import controller
 
 
 # ===================== Small Utilities =====================

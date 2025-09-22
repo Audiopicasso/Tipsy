@@ -18,7 +18,7 @@ SHOW_RELOAD_COCKTAILS_BUTTON = True  # Show/hide reload cocktails button
 RELOAD_COCKTAILS_TIMEOUT = None  # Auto-reload timeout (None = disabled)
 CONFIG_FILE = "pump_config.json"  # Pump configuration file
 from helpers import get_cocktail_image_path, get_valid_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
-# Controller wird erst bei Bedarf importiert, um GPIO-Konflikte zu vermeiden
+from controller import make_drink
 
 import logging
 logger = logging.getLogger(__name__)
@@ -1467,8 +1467,6 @@ def run_interface():
                             if single_logo:
                                 animate_logo_click(single_logo, single_rect, base_size=150, target_size=220, layer_key='single_logo', duration=150)
 
-                            # Importiere Controller erst bei Bedarf
-                            from controller import make_drink
                             executor_watcher = make_drink(current_cocktail, 'single')
 
                             show_pouring_and_loading(watcher=executor_watcher)
@@ -1478,8 +1476,6 @@ def run_interface():
                             if double_logo:
                                 animate_logo_click(double_logo, double_rect, base_size=150, target_size=220, layer_key='double_logo', duration=150)
 
-                            # Importiere Controller erst bei Bedarf
-                            from controller import make_drink
                             executor_watcher = make_drink(current_cocktail, 'double')
 
                             show_pouring_and_loading(executor_watcher)
