@@ -9,7 +9,7 @@ import os
 from settings import (
     DEBUG, COCKTAILS_FILE, LOGO_FOLDER, ML_COEFFICIENT, 
     RETRACTION_TIME, PUMP_CONCURRENCY, INVERT_PUMP_PINS, 
-    FULL_SCREEN, COCKTAIL_IMAGE_SCALE
+    FULL_SCREEN, COCKTAIL_IMAGE_SCALE, OPENAI_API_KEY
 )
 
 # Configuration flags
@@ -18,6 +18,8 @@ SHOW_RELOAD_COCKTAILS_BUTTON = True  # Show/hide reload cocktails button
 RELOAD_COCKTAILS_TIMEOUT = None  # Auto-reload timeout (None = disabled)
 CONFIG_FILE = "pump_config.json"  # Pump configuration file
 from helpers import get_cocktail_image_path, get_valid_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
+import os
+os.environ.setdefault('TIPSY_PROCESS', 'interface')
 from controller import make_drink
 
 import logging

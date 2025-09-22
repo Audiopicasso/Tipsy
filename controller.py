@@ -9,6 +9,7 @@ import concurrent.futures
 
 from settings import *
 from bottle_monitor import bottle_monitor
+from gpio_lock import GPIOLock
 
 # GPIO-Initialisierung mit gpiozero
 if not DEBUG:
@@ -65,6 +66,20 @@ MOTORS = [
 # Motor-Controller werden erst bei Bedarf erstellt
 motor_controllers_a = None
 motor_controllers_b = None
+lock_held = False
+gpio_lock = GPIOLock()
+OWNER_FILE = 'gpio_owner.txt'
+PROCESS_ROLE = os.getenv('TIPSY_PROCESS', 'interface')
+
+def _read_gpio_owner() -> str:
+    try:
+        if os.path.exists(OWNER_FILE):
+            with open(OWNER_FILE, 'r', encoding='utf-8') as f:
+                return f.read().strip().lower()
+    except Exception:
+        pass
+    # Standardmäßig gehört die GPIO-Steuerung der Oberfläche (interface)
+    return 'interface'
 
 def _init_motor_controllers():
     """Initialisiert die Motor-Controller nur wenn nötig"""
@@ -73,11 +88,68 @@ def _init_motor_controllers():
         motor_controllers_a = [DigitalOutputDevice(ia) for ia, ib in MOTORS]
         motor_controllers_b = [DigitalOutputDevice(ib) for ia, ib in MOTORS]
 
+def _release_motor_controllers():
+    """Schließt alle Motor-Controller und gibt Ressourcen frei."""
+    global motor_controllers_a, motor_controllers_b
+    try:
+        if motor_controllers_a:
+            for d in motor_controllers_a:
+                try:
+                    d.off()
+                except Exception:
+                    pass
+                try:
+                    d.close()
+                except Exception:
+                    pass
+        if motor_controllers_b:
+            for d in motor_controllers_b:
+                try:
+                    d.off()
+                except Exception:
+                    pass
+                try:
+                    d.close()
+                except Exception:
+                    pass
+    finally:
+        motor_controllers_a = None
+        motor_controllers_b = None
+
+def _acquire_gpio_or_raise():
+    """Versucht exklusiven Zugriff auf GPIO zu bekommen und prüft Besitzrecht per Toggle-Datei."""
+    global lock_held
+    if DEBUG:
+        return
+    owner = _read_gpio_owner()
+    if owner not in ('interface', 'streamlit'):
+        owner = 'interface'
+    if owner != PROCESS_ROLE:
+        raise RuntimeError(f'GPIO an {owner} vergeben – bitte Toggle in Streamlit ändern')
+    # Versuche Lock zu bekommen
+    if not lock_held:
+        if not gpio_lock.acquire():
+            raise RuntimeError('GPIO busy')
+        lock_held = True
+
+def _release_gpio_if_held():
+    """Gibt Lock und Controller frei, falls gehalten."""
+    global lock_held
+    if DEBUG:
+        return
+    _release_motor_controllers()
+    if lock_held:
+        try:
+            gpio_lock.release()
+        finally:
+            lock_held = False
+
 def setup_gpio():
     """Set up all motor pins for OUTPUT."""
     if DEBUG:
         logger.debug('setup_gpio() called — Not actually initializing GPIO pins.')
     else:
+        _acquire_gpio_or_raise()
         _init_motor_controllers()
         logger.debug('GPIO pins initialized with gpiozero')
 
@@ -167,8 +239,7 @@ def prime_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            # GPIO cleanup not needed with gpiozero
-            pass
+            _release_gpio_if_held()
         else:
             logger.debug('prime_pumps() complete — no GPIO cleanup in debug mode.')
 
@@ -186,8 +257,7 @@ def clean_pumps(duration=10):
             motor_stop(ia, ib)
     finally:
         if not DEBUG:
-            # GPIO cleanup not needed with gpiozero
-            pass
+            _release_gpio_if_held()
         else:
             logger.debug('clean_pumps() complete no GPIO cleanup in debug mode.')
 
@@ -287,8 +357,7 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         logger.error(f"Fehler beim Synchronisieren der Flaschen-Status: {e}")
 
     if not DEBUG:
-        # GPIO cleanup not needed with gpiozero
-        pass
+        _release_gpio_if_held()
     else:
         logger.debug('pour_ingredients() complete — no GPIO cleanup in debug mode.')
 
