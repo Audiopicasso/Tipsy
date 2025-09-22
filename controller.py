@@ -10,6 +10,7 @@ import concurrent.futures
 from settings import *
 from bottle_monitor import bottle_monitor
 from gpio_lock import GPIOLock
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # GPIO-Initialisierung mit gpiozero
 if not DEBUG:
@@ -68,7 +69,7 @@ motor_controllers_a = None
 motor_controllers_b = None
 lock_held = False
 gpio_lock = GPIOLock()
-OWNER_FILE = 'gpio_owner.txt'
+OWNER_FILE = os.path.join(BASE_DIR, 'gpio_owner.txt')
 PROCESS_ROLE = os.getenv('TIPSY_PROCESS', 'interface')
 
 def _read_gpio_owner() -> str:

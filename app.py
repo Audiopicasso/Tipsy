@@ -392,7 +392,8 @@ with tabs[1]:
 
     # ===================== GPIO Ownership Toggle =====================
     st.subheader("GPIO-Steuerung")
-    OWNER_FILE = "gpio_owner.txt"
+    from pathlib import Path as _Path
+    OWNER_FILE = str((_Path(__file__).parent / "gpio_owner.txt").resolve())
     current_owner = "interface"
     try:
         if os.path.exists(OWNER_FILE):

@@ -20,6 +20,15 @@ CONFIG_FILE = "pump_config.json"  # Pump configuration file
 from helpers import get_cocktail_image_path, get_valid_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
 import os
 os.environ.setdefault('TIPSY_PROCESS', 'interface')
+# Setze Owner-Datei explizit in Projekt-Ordner
+try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    owner_file = os.path.join(base_dir, 'gpio_owner.txt')
+    if not os.path.exists(owner_file):
+        with open(owner_file, 'w', encoding='utf-8') as f:
+            f.write('interface')
+except Exception:
+    pass
 from controller import make_drink
 
 import logging
