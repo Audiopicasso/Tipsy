@@ -394,7 +394,7 @@ with tabs[1]:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 🌀 Peristaltische Pumpen (Pumpen 1-6)")
+        st.markdown("### 🌀 Peristaltische Pumpen (Pumpen 7-12)")
         st.info("Diese Pumpen haben sehr dünne Schläuche und pumpen typischerweise langsamer")
         
         # Peristaltische Pumpen Kalibrierung
@@ -404,7 +404,7 @@ with tabs[1]:
             max_value=120.0,
             value=12.0,
             step=0.5,
-            help="Wie viele Sekunden brauchen die peristaltischen Pumpen (1-6), um 50ml zu pumpen?",
+            help="Wie viele Sekunden brauchen die peristaltischen Pumpen (7-12), um 50ml zu pumpen?",
             key="peristaltic_ml_coefficient_input"
         )
         
@@ -442,7 +442,7 @@ with tabs[1]:
                 st.error(f"❌ Fehler beim Speichern der Kalibrierung: {e}")
     
     with col2:
-        st.markdown("### 💨 Membranpumpen (Pumpen 7-12)")
+        st.markdown("### 💨 Membranpumpen (Pumpen 1-6)")
         st.info("Diese Pumpen haben dickere Schläuche und pumpen typischerweise schneller")
         
         # Membranpumpen Kalibrierung
@@ -452,7 +452,7 @@ with tabs[1]:
             max_value=120.0,
             value=6.0,
             step=0.5,
-            help="Wie viele Sekunden brauchen die Membranpumpen (7-12), um 50ml zu pumpen?",
+            help="Wie viele Sekunden brauchen die Membranpumpen (1-6), um 50ml zu pumpen?",
             key="membrane_ml_coefficient_input"
         )
         
@@ -514,14 +514,14 @@ with tabs[1]:
                 
                 with col1:
                     st.metric(
-                        "Peristaltische Pumpen (1-6)",
+                        "Peristaltische Pumpen (7-12)",
                         f"{current_peristaltic * 50:.1f}s für 50ml",
                         f"{current_peristaltic:.4f} s/ml"
                     )
                 
                 with col2:
                     st.metric(
-                        "Membranpumpen (7-12)",
+                        "Membranpumpen (1-6)",
                         f"{current_membrane * 50:.1f}s für 50ml",
                         f"{current_membrane:.4f} s/ml"
                     )
@@ -584,7 +584,7 @@ with tabs[1]:
         st.markdown("#### Teste peristaltische Pumpe")
         peristaltic_test_pump = st.selectbox(
             "Wähle Pumpe",
-            options=[1, 2, 3, 4, 5, 6],
+            options=[7, 8, 9, 10, 11, 12],
             help="Wähle eine peristaltische Pumpe zum Testen",
             key="peristaltic_test_pump_select"
         )
@@ -624,7 +624,7 @@ with tabs[1]:
         st.markdown("#### Teste Membranpumpe")
         membrane_test_pump = st.selectbox(
             "Wähle Pumpe",
-            options=[7, 8, 9, 10, 11, 12],
+            options=[1, 2, 3, 4, 5, 6],
             help="Wähle eine Membranpumpe zum Testen",
             key="membrane_test_pump_select"
         )
