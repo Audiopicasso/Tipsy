@@ -789,15 +789,8 @@ def create_drink_management_tray():
     dur_plus_rect = pygame.Rect(screen_width // 2 + 90, dur_y + 20, 50, 45)
     dur_value_rect = pygame.Rect(screen_width // 2 - 70, dur_y + 20, 140, 45)
 
-    # Direction toggle
-    dir_y = dur_y + section_gap
-    dir_rect = pygame.Rect(screen_width // 2 - 70, dir_y, 140, 36)
-    dir_label_small = pygame.font.SysFont('Arial', 18)
-    dir_label_text = dir_label_small.render("Richtung: vorwärts", True, (220, 220, 220))
-    dir_label_rect = dir_label_text.get_rect(center=(screen_width // 2, dir_y - 18))
-
     # Test button
-    test_button_rect = pygame.Rect(screen_width // 2 - 120, dir_y + 60, 240, 55)
+    test_button_rect = pygame.Rect(screen_width // 2 - 120, dur_y + section_gap + 60, 240, 55)
     test_font = pygame.font.SysFont('Arial', 24, bold=True)
     test_text = test_font.render("Pumpe testen", True, (255, 255, 255))
     test_text_rect = test_text.get_rect(center=test_button_rect.center)
@@ -818,14 +811,11 @@ def create_drink_management_tray():
         'dur_value_rect': dur_value_rect,
         'dur_label': dur_label,
         'dur_label_rect': dur_label_rect,
-        'dir_rect': dir_rect,
-        'dir_label_rect': dir_label_rect,
         'test_button_rect': test_button_rect,
         'test_text': test_text,
         'test_text_rect': test_text_rect,
         'selected_pump': 1,
         'duration_sec': 5.0,
-        'reverse': False,
         'testing': False
     }
 
@@ -909,18 +899,6 @@ def draw_drink_management_tray(drink_ui, is_visible, events=None):
     temp_surface.blit(plus_text, plus_text.get_rect(center=(int(drink_ui['dur_plus_rect'].centerx), int(drink_ui['dur_plus_rect'].centery))))
     temp_surface.blit(dur_val_text, dur_val_text.get_rect(center=(int(drink_ui['dur_value_rect'].centerx), int(drink_ui['dur_value_rect'].centery))))
 
-    # Direction toggle
-    pygame.draw.rect(temp_surface, (100, 100, 100), drink_ui['dir_rect'])
-    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dir_rect'], 2)
-    knob_x = int(drink_ui['dir_rect'].x + (drink_ui['dir_rect'].width - 18 - 4 if drink_ui['reverse'] else 4))
-    knob_rect = pygame.Rect(knob_x, int(drink_ui['dir_rect'].y + 4), 18, int(drink_ui['dir_rect'].height - 8))
-    pygame.draw.rect(temp_surface, (0, 200, 0) if not drink_ui['reverse'] else (200, 100, 100), knob_rect)
-    dir_label_small = pygame.font.SysFont('Arial', 18)
-    dir_text = "Richtung: rückwärts" if drink_ui['reverse'] else "Richtung: vorwärts"
-    dir_text_surf = dir_label_small.render(dir_text, True, (220, 220, 220))
-    dir_text_rect = dir_text_surf.get_rect(center=(int(screen_width // 2), int(drink_ui['dir_rect'].y - 18)))
-    temp_surface.blit(dir_text_surf, dir_text_rect)
-
     # Test button
     pygame.draw.rect(temp_surface, (50, 150, 50) if not drink_ui['testing'] else (120, 120, 120), drink_ui['test_button_rect'])
     pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['test_button_rect'], 2)
@@ -979,10 +957,8 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         drink_ui['dur_plus_rect'].y = int(dy2 + 20)
         drink_ui['dur_value_rect'].y = int(dy2 + 20)
 
-        # Direction and button
-        dy3 = int(dy2 + 80)
-        drink_ui['dir_rect'].y = int(dy3)
-        drink_ui['test_button_rect'].y = int(dy3 + 60)
+        # Button position (ohne Richtungs-Toggle)
+        drink_ui['test_button_rect'].y = int(dy2 + 60 + 80)
         drink_ui['test_text_rect'].center = drink_ui['test_button_rect'].center
         
         # No tab layer to update anymore
@@ -1005,8 +981,6 @@ def handle_drink_management_interaction(drink_ui, event, event_pos):
             return 'dur_minus'
         if drink_ui['dur_plus_rect'].collidepoint(event_pos):
             return 'dur_plus'
-        if drink_ui['dir_rect'].collidepoint(event_pos):
-            return 'toggle_dir'
         if drink_ui['test_button_rect'].collidepoint(event_pos):
             return 'test_pump'
     return None
@@ -1207,22 +1181,17 @@ def run_interface():
                             drink_ui['duration_sec'] = max(0.5, round(drink_ui['duration_sec'] - 0.5, 1))
                         elif interaction == 'dur_plus':
                             drink_ui['duration_sec'] = min(60.0, round(drink_ui['duration_sec'] + 0.5, 1))
-                        elif interaction == 'toggle_dir':
-                            drink_ui['reverse'] = not drink_ui['reverse']
                         elif interaction == 'test_pump' and not drink_ui['testing']:
                             # Run pump test in a thread to avoid UI blocking
                             import threading
                             def run_test():
                                 try:
                                     drink_ui['testing'] = True
-                                    from controller import setup_gpio, motor_forward, motor_reverse, motor_stop, MOTORS
+                                    from controller import setup_gpio, motor_forward, motor_stop, MOTORS
                                     setup_gpio()
                                     pump_index = drink_ui['selected_pump'] - 1
                                     ia, ib = MOTORS[pump_index]
-                                    if drink_ui['reverse']:
-                                        motor_reverse(ia, ib)
-                                    else:
-                                        motor_forward(ia, ib)
+                                    motor_forward(ia, ib)
                                     time.sleep(drink_ui['duration_sec'])
                                 except Exception as e:
                                     logger.error(f"Pump test failed: {e}")
