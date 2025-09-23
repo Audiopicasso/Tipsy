@@ -1179,14 +1179,7 @@ def run_interface():
         
         events = pygame.event.get()
         for event in events:
-            # Handle dropdown events globally if drink tray is visible
-            if drink_visible:
-                for dropdown in drink_ui['dropdowns']:
-                    if dropdown['dropdown'].handle_event(event):
-                        # Check if selection changed
-                        new_value = dropdown['dropdown'].get_selected()
-                        if new_value != dropdown['current_value']:
-                            update_dropdown_selection(dropdown, new_value)
+            # Keine Dropdown-Events mehr im Pumpen-Test-Menü
             
             if event.type == pygame.QUIT:
                 running = False
@@ -1325,10 +1318,7 @@ def run_interface():
                                 else:
                                     # Close if already open
                                     drink_visible = False
-                                    # Remove all pump labels when closing
-                                    for dropdown in drink_ui['dropdowns']:
-                                        remove_layer(f'pump_label_{dropdown["pump_number"]}')
-                                    _force_remove_pump_labels()
+                                    remove_layer('pump_test_controls')
                                     animate_drink_management_tray(drink_ui, None, drink_visible)
                         elif swipe_distance_y < 0:  # Swipe up (from bottom)
                             # Only open settings if swipe starts in bottom 10% of screen
@@ -1336,10 +1326,7 @@ def run_interface():
                                 # Check if drink management is already open - if so, close it first
                                 if drink_visible:
                                     drink_visible = False
-                                    # Remove all pump labels when closing
-                                    for dropdown in drink_ui['dropdowns']:
-                                        remove_layer(f'pump_label_{dropdown["pump_number"]}')
-                                    _force_remove_pump_labels()
+                                    remove_layer('pump_test_controls')
                                     animate_drink_management_tray(drink_ui, None, drink_visible)
                                 
                                 # Now open settings menu (pull-up)
