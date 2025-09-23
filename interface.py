@@ -863,15 +863,15 @@ def draw_drink_management_tray(drink_ui, is_visible, events=None):
     header_rect = pygame.Rect(drink_ui['tray_rect'].x, drink_ui['tray_rect'].y,
                               drink_ui['tray_rect'].width, 70)
     add_layer(drink_ui['header_surface'], header_rect, key='drink_header')
-    add_layer(drink_ui['title_text'], (screen_width // 2 - drink_ui['title_text'].get_width() // 2,
-                                       drink_ui['tray_rect'].y + 20), key='drink_title')
+    add_layer(drink_ui['title_text'], (int(screen_width // 2 - drink_ui['title_text'].get_width() // 2),
+                                       int(drink_ui['tray_rect'].y + 20)), key='drink_title')
 
     # Temporary surface to draw controls
     temp_surface = pygame.Surface(screen_size, pygame.SRCALPHA)
 
     # Pump label
-    temp_surface.blit(drink_ui['pump_label'], (drink_ui['pump_label_rect'].x,
-                                               drink_ui['tray_rect'].y + drink_ui['pump_label_rect'].y))
+    temp_surface.blit(drink_ui['pump_label'], (int(drink_ui['pump_label_rect'].x),
+                                               int(drink_ui['pump_label_rect'].y)))
 
     # Pump controls
     pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['pump_minus_rect'])
@@ -888,13 +888,14 @@ def draw_drink_management_tray(drink_ui, is_visible, events=None):
     plus_text = plus_font.render('+', True, (255, 255, 255))
     pump_val_text = val_font.render(str(drink_ui['selected_pump']), True, (255, 255, 255))
 
-    temp_surface.blit(minus_text, minus_text.get_rect(center=drink_ui['pump_minus_rect'].center))
-    temp_surface.blit(plus_text, plus_text.get_rect(center=drink_ui['pump_plus_rect'].center))
-    temp_surface.blit(pump_val_text, pump_val_text.get_rect(center=drink_ui['pump_value_rect'].center))
+    temp_surface.blit(minus_text, minus_text.get_rect(center=(int(drink_ui['pump_minus_rect'].centerx), int(drink_ui['pump_minus_rect'].centery))))
+    temp_surface.blit(plus_text, plus_text.get_rect(center=(int(drink_ui['pump_plus_rect'].centerx), int(drink_ui['pump_plus_rect'].centery))))
+    temp_surface.blit(pump_val_text, pump_val_text.get_rect(center=(int(drink_ui['pump_value_rect'].centerx), int(drink_ui['pump_value_rect'].centery))))
 
     # Duration controls
-    temp_surface.blit(drink_ui['dur_label'], (drink_ui['dur_label_rect'].x,
-                                              drink_ui['tray_rect'].y + (drink_ui['dur_label_rect'].y - drink_ui['pump_label_rect'].y)))
+    # Duration label centered
+    dur_label_pos = drink_ui['dur_label'].get_rect(center=(int(screen_width // 2), int(drink_ui['dur_label_rect'].y)))
+    temp_surface.blit(drink_ui['dur_label'], dur_label_pos)
 
     pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['dur_minus_rect'])
     pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['dur_plus_rect'])
@@ -904,20 +905,20 @@ def draw_drink_management_tray(drink_ui, is_visible, events=None):
     pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dur_value_rect'], 2)
 
     dur_val_text = val_font.render(f"{drink_ui['duration_sec']:.1f}", True, (255, 255, 255))
-    temp_surface.blit(minus_text, minus_text.get_rect(center=drink_ui['dur_minus_rect'].center))
-    temp_surface.blit(plus_text, plus_text.get_rect(center=drink_ui['dur_plus_rect'].center))
-    temp_surface.blit(dur_val_text, dur_val_text.get_rect(center=drink_ui['dur_value_rect'].center))
+    temp_surface.blit(minus_text, minus_text.get_rect(center=(int(drink_ui['dur_minus_rect'].centerx), int(drink_ui['dur_minus_rect'].centery))))
+    temp_surface.blit(plus_text, plus_text.get_rect(center=(int(drink_ui['dur_plus_rect'].centerx), int(drink_ui['dur_plus_rect'].centery))))
+    temp_surface.blit(dur_val_text, dur_val_text.get_rect(center=(int(drink_ui['dur_value_rect'].centerx), int(drink_ui['dur_value_rect'].centery))))
 
     # Direction toggle
     pygame.draw.rect(temp_surface, (100, 100, 100), drink_ui['dir_rect'])
     pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dir_rect'], 2)
-    knob_x = drink_ui['dir_rect'].x + (drink_ui['dir_rect'].width - 18 - 4 if drink_ui['reverse'] else 4)
-    knob_rect = pygame.Rect(knob_x, drink_ui['dir_rect'].y + 4, 18, drink_ui['dir_rect'].height - 8)
+    knob_x = int(drink_ui['dir_rect'].x + (drink_ui['dir_rect'].width - 18 - 4 if drink_ui['reverse'] else 4))
+    knob_rect = pygame.Rect(knob_x, int(drink_ui['dir_rect'].y + 4), 18, int(drink_ui['dir_rect'].height - 8))
     pygame.draw.rect(temp_surface, (0, 200, 0) if not drink_ui['reverse'] else (200, 100, 100), knob_rect)
     dir_label_small = pygame.font.SysFont('Arial', 18)
     dir_text = "Richtung: rückwärts" if drink_ui['reverse'] else "Richtung: vorwärts"
     dir_text_surf = dir_label_small.render(dir_text, True, (220, 220, 220))
-    dir_text_rect = dir_text_surf.get_rect(center=(screen_width // 2, drink_ui['dir_rect'].y - 18))
+    dir_text_rect = dir_text_surf.get_rect(center=(int(screen_width // 2), int(drink_ui['dir_rect'].y - 18)))
     temp_surface.blit(dir_text_surf, dir_text_rect)
 
     # Test button
@@ -953,7 +954,8 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         progress = min(elapsed / duration, 1.0)
         
         current_y = start_y + (end_y - start_y) * progress
-        drink_ui['tray_rect'].y = current_y
+        current_y_int = int(current_y)
+        drink_ui['tray_rect'].y = current_y_int
         
         # No tab to update anymore
         
@@ -964,23 +966,23 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         
         # Update control positions vertically
         # Pump controls
-        dy = current_y + 30
-        drink_ui['pump_label_rect'].y = dy
-        drink_ui['pump_minus_rect'].y = dy + 20
-        drink_ui['pump_plus_rect'].y = dy + 20
-        drink_ui['pump_value_rect'].y = dy + 20
+        dy = current_y_int + 30
+        drink_ui['pump_label_rect'].y = int(dy)
+        drink_ui['pump_minus_rect'].y = int(dy + 20)
+        drink_ui['pump_plus_rect'].y = int(dy + 20)
+        drink_ui['pump_value_rect'].y = int(dy + 20)
 
         # Duration controls
-        dy2 = dy + 80
-        drink_ui['dur_label_rect'].y = dy2
-        drink_ui['dur_minus_rect'].y = dy2 + 20
-        drink_ui['dur_plus_rect'].y = dy2 + 20
-        drink_ui['dur_value_rect'].y = dy2 + 20
+        dy2 = int(dy + 80)
+        drink_ui['dur_label_rect'].y = int(dy2)
+        drink_ui['dur_minus_rect'].y = int(dy2 + 20)
+        drink_ui['dur_plus_rect'].y = int(dy2 + 20)
+        drink_ui['dur_value_rect'].y = int(dy2 + 20)
 
         # Direction and button
-        dy3 = dy2 + 80
-        drink_ui['dir_rect'].y = dy3
-        drink_ui['test_button_rect'].y = dy3 + 60
+        dy3 = int(dy2 + 80)
+        drink_ui['dir_rect'].y = int(dy3)
+        drink_ui['test_button_rect'].y = int(dy3 + 60)
         drink_ui['test_text_rect'].center = drink_ui['test_button_rect'].center
         
         # No tab layer to update anymore
