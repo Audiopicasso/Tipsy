@@ -103,9 +103,10 @@ PUMP_CONCURRENCY = 6
 # INVERT_PUMP_PINS: Set to True if your pump motors run in the opposite direction
 INVERT_PUMP_PINS = False
 
-# Pump type definitions
-PERISTALTIC_PUMPS = [1, 2, 3, 4, 5, 6]  # Peristaltische Pumpen
-MEMBRANE_PUMPS = [7, 8, 9, 10, 11, 12]  # Membranpumpen
+# Pump type definitions (Pi5 Setup):
+# 1-6 Membranpumpen, 7-12 Peristaltische Pumpen
+PERISTALTIC_PUMPS = [7, 8, 9, 10, 11, 12]
+MEMBRANE_PUMPS    = [1, 2, 3, 4, 5, 6]
 
 def get_pump_coefficient(pump_number):
     """Gibt den entsprechenden Kalibrierungskoeffizienten für eine bestimmte Pumpe zurück"""

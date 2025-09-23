@@ -146,8 +146,9 @@ class Pour:
         motor_forward(ia, ib)
         time.sleep(seconds_to_pour)
 
-        if RETRACTION_TIME:
-            logger.info(f'Retracting Pump {pump_number} for {RETRACTION_TIME:.2f} seconds')
+        # Nur bei peristaltischen Pumpen Retract durchführen (Membranpumpen können nicht reversen)
+        if RETRACTION_TIME and pump_number in PERISTALTIC_PUMPS:
+            logger.info(f'Retracting Pump {pump_number} for {RETRACTION_TIME:.2f} seconds (peristaltic only)')
             motor_reverse(ia, ib)
             time.sleep(RETRACTION_TIME)
 
