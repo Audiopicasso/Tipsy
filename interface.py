@@ -1,5 +1,6 @@
 # interface.py
 import pygame
+import time
 import json
 import qrcode
 import io
@@ -746,189 +747,86 @@ def toggle_pump_direction():
     logger.info(f'Pump direction inverted: {INVERT_PUMP_PINS}')
 
 def create_drink_management_tray():
-    """Create the drink management tray UI elements"""
-    tray_height = int(screen_height * 0.8)  # 80% of screen height
+    """Create the drink management tray UI elements (Pumpen-Test)."""
+    tray_height = int(screen_height * 0.6)
     tray_rect = pygame.Rect(0, -tray_height, screen_width, tray_height)
-    
-    # Create a gradient background for better aesthetics
+
     overlay = pygame.Surface((screen_width, tray_height))
     overlay.set_alpha(220)
-    # Create gradient effect
     for y in range(tray_height):
-        alpha = int(255 * (1 - y / tray_height) * 0.8)
         color = (20, 25, 35)
         pygame.draw.line(overlay, color, (0, y), (screen_width, y))
-    
-    # Header section with better styling
-    header_height = 80
+
+    header_height = 70
     header_surface = pygame.Surface((screen_width, header_height))
     header_surface.set_alpha(180)
     header_surface.fill((25, 30, 40))
-    
-    # Title removed - no more "Drink Management" text
-    title_text = None
-    title_shadow = None
-    title_rect = None
-    title_shadow_rect = None
-    
-    # Load drink options
-    try:
-        with open('drink_options.json', 'r') as f:
-            drink_data = json.load(f)
-            drink_options = drink_data['drinks']
-        print(f"Loaded {len(drink_options)} drink options from JSON")
-    except Exception as e:
-        print(f"Error loading drink options: {e}")
-        drink_options = ["", "Vodka", "Gin", "Rum", "Tequila", "Whiskey", "Bourbon", "Scotch", "Brandy", "Cognac"]
-        print(f"Using fallback options: {len(drink_options)} drinks")
-    
-    # Load current pump configuration
-    try:
-        with open(CONFIG_FILE, 'r') as f:
-            current_config = json.load(f)
-    except:
-        current_config = {}
-    
-    # Create custom dropdowns for 12 pumps with better layout
-    dropdowns = []
-    dropdown_width = 180  # Slightly smaller for better fit
-    dropdown_height = 45
-    dropdown_spacing = 25
-    
-    # Calculate positions for a more organized 6x2 grid
-    total_width = 6 * dropdown_width + 5 * dropdown_spacing
-    start_x = (screen_width - total_width) // 2
-    
-    # Top row (pumps 1-6) - with better spacing
-    top_row_y = header_height + 40
-    for i in range(6):
-        x = start_x + i * (dropdown_width + dropdown_spacing)
-        y = top_row_y
-        
-        # Styled pump label
-        label_font = pygame.font.SysFont('Arial', 20, bold=True)
-        label_text = label_font.render(f"Pump {i+1}", True, (220, 220, 220))
-        label_rect = label_text.get_rect(center=(x + dropdown_width // 2, y - 15))
-        
-        # Current selection
-        current_drink = current_config.get(f"Pump {i+1}", "")
-        
-        # Create custom dropdown
-        try:
-            dropdown = CustomDropdown(
-                x, y, dropdown_width, dropdown_height,
-                drink_options, current_drink, font_size=16
-            )
-            logger.debug(f"Created dropdown for Pump {i+1} at ({x}, {y}) with {len(drink_options)} options")
-        except Exception as e:
-            logger.error(f"Error creating dropdown for Pump {i+1}: {e}")
-            # Create a fallback dropdown
-            dropdown = CustomDropdown(
-                x, y, dropdown_width, dropdown_height,
-                ["", "Error"], "", font_size=16
-            )
-        
-        dropdowns.append({
-            'dropdown': dropdown,
-            'label_text': label_text,
-            'label_rect': label_rect,
-            'current_value': current_drink,
-            'pump_number': i+1,
-            'rect': pygame.Rect(x, y, dropdown_width, dropdown_height)
-        })
-    
-    # Bottom row (pumps 7-12) - with better spacing
-    bottom_row_y = top_row_y + 120
-    for i in range(6):
-        x = start_x + i * (dropdown_width + dropdown_spacing)
-        y = bottom_row_y
-        
-        # Styled pump label
-        label_font = pygame.font.SysFont('Arial', 20, bold=True)
-        label_text = label_font.render(f"Pump {i+7}", True, (220, 220, 220))
-        label_rect = label_text.get_rect(center=(x + dropdown_width // 2, y - 15))
-        
-        # Current selection
-        current_drink = current_config.get(f"Pump {i+7}", "")
-        
-        # Create custom dropdown
-        try:
-            dropdown = CustomDropdown(
-                x, y, dropdown_width, dropdown_height,
-                drink_options, current_drink, font_size=16
-            )
-            logger.debug(f"Created dropdown for Pump {i+7} at ({x}, {y}) with {len(drink_options)} options")
-        except Exception as e:
-            logger.error(f"Error creating dropdown for Pump {i+7}: {e}")
-            # Create a fallback dropdown
-            dropdown = CustomDropdown(
-                x, y, dropdown_width, dropdown_height,
-                ["", "Error"], "", font_size=16
-            )
-        
-        dropdowns.append({
-            'dropdown': dropdown,
-            'label_text': label_text,
-            'label_rect': label_rect,
-            'current_value': current_drink,
-            'pump_number': i+7,
-            'rect': pygame.Rect(x, y, dropdown_width, dropdown_height)
-        })
-    
-    # Styled Generate button at the bottom
-    generate_button_width = 250
-    generate_button_height = 55
-    generate_button_x = (screen_width - generate_button_width) // 2
-    generate_button_y = bottom_row_y + 150
-    
-    generate_button_rect = pygame.Rect(generate_button_x, generate_button_y, generate_button_width, generate_button_height)
-    generate_font = pygame.font.SysFont('Arial', 24, bold=True)
-    generate_text = generate_font.render("Generate New Menu", True, (255, 255, 255))
-    generate_text_rect = generate_text.get_rect(center=generate_button_rect.center)
-    
-    # Favoriten- und Reload-Buttons
-    button_spacing = 20
-    button_width = 120
-    button_height = 45
-    
-    # Favoriten-Button
-    favorite_button_x = generate_button_x - button_width - button_spacing
-    favorite_button_y = generate_button_y + generate_button_height + 20
-    favorite_button_rect = pygame.Rect(favorite_button_x, favorite_button_y, button_width, button_height)
-    
-    # Reload-Button
-    reload_button_x = generate_button_x + generate_button_width + button_spacing
-    reload_button_y = favorite_button_y
-    reload_button_rect = pygame.Rect(reload_button_x, reload_button_y, button_width, button_height)
-    
-    # Button-Text
-    favorite_font = pygame.font.SysFont('Arial', 18, bold=True)
-    reload_font = pygame.font.SysFont('Arial', 18, bold=True)
-    
-    favorite_text = favorite_font.render("Favoriten", True, (255, 255, 255))
-    reload_text = reload_font.render("Reload", True, (255, 255, 255))
-    
-    favorite_text_rect = favorite_text.get_rect(center=favorite_button_rect.center)
-    reload_text_rect = reload_text.get_rect(center=reload_button_rect.center)
-    
+
+    title_font = pygame.font.SysFont('Arial', 28, bold=True)
+    title_text = title_font.render("Pumpen-Test", True, (220, 220, 220))
+    title_rect = title_text.get_rect(center=(screen_width // 2, header_height // 2))
+
+    # Controls layout
+    controls_y = header_height + 30
+    section_gap = 80
+
+    # Pump selection controls
+    pump_label_font = pygame.font.SysFont('Arial', 22, bold=True)
+    pump_label = pump_label_font.render("Pumpe", True, (220, 220, 220))
+    pump_label_rect = pump_label.get_rect(center=(screen_width // 2, controls_y))
+
+    pump_minus_rect = pygame.Rect(screen_width // 2 - 140, controls_y + 20, 50, 45)
+    pump_plus_rect = pygame.Rect(screen_width // 2 + 90, controls_y + 20, 50, 45)
+    pump_value_rect = pygame.Rect(screen_width // 2 - 70, controls_y + 20, 140, 45)
+
+    # Duration controls
+    dur_y = controls_y + section_gap
+    dur_label_font = pygame.font.SysFont('Arial', 22, bold=True)
+    dur_label = dur_label_font.render("Dauer (s)", True, (220, 220, 220))
+    dur_label_rect = dur_label.get_rect(center=(screen_width // 2, dur_y))
+
+    dur_minus_rect = pygame.Rect(screen_width // 2 - 140, dur_y + 20, 50, 45)
+    dur_plus_rect = pygame.Rect(screen_width // 2 + 90, dur_y + 20, 50, 45)
+    dur_value_rect = pygame.Rect(screen_width // 2 - 70, dur_y + 20, 140, 45)
+
+    # Direction toggle
+    dir_y = dur_y + section_gap
+    dir_rect = pygame.Rect(screen_width // 2 - 70, dir_y, 140, 36)
+    dir_label_small = pygame.font.SysFont('Arial', 18)
+    dir_label_text = dir_label_small.render("Richtung: vorwärts", True, (220, 220, 220))
+    dir_label_rect = dir_label_text.get_rect(center=(screen_width // 2, dir_y - 18))
+
+    # Test button
+    test_button_rect = pygame.Rect(screen_width // 2 - 120, dir_y + 60, 240, 55)
+    test_font = pygame.font.SysFont('Arial', 24, bold=True)
+    test_text = test_font.render("Pumpe testen", True, (255, 255, 255))
+    test_text_rect = test_text.get_rect(center=test_button_rect.center)
+
     return {
         'tray_rect': tray_rect,
         'overlay': overlay,
         'header_surface': header_surface,
         'title_text': title_text,
-        'title_shadow': title_shadow,
         'title_rect': title_rect,
-        'title_shadow_rect': title_shadow_rect,
-        'dropdowns': dropdowns,
-        'generate_button_rect': generate_button_rect,
-        'generate_text': generate_text,
-        'generate_text_rect': generate_text_rect,
-        'favorite_button_rect': favorite_button_rect,
-        'favorite_text': favorite_text,
-        'favorite_text_rect': favorite_text_rect,
-        'reload_button_rect': reload_button_rect,
-        'reload_text': reload_text,
-        'reload_text_rect': reload_text_rect
+        'pump_minus_rect': pump_minus_rect,
+        'pump_plus_rect': pump_plus_rect,
+        'pump_value_rect': pump_value_rect,
+        'pump_label': pump_label,
+        'pump_label_rect': pump_label_rect,
+        'dur_minus_rect': dur_minus_rect,
+        'dur_plus_rect': dur_plus_rect,
+        'dur_value_rect': dur_value_rect,
+        'dur_label': dur_label,
+        'dur_label_rect': dur_label_rect,
+        'dir_rect': dir_rect,
+        'dir_label_rect': dir_label_rect,
+        'test_button_rect': test_button_rect,
+        'test_text': test_text,
+        'test_text_rect': test_text_rect,
+        'selected_pump': 1,
+        'duration_sec': 5.0,
+        'reverse': False,
+        'testing': False
     }
 
 def create_drink_management_tab():
@@ -956,63 +854,78 @@ def create_drink_management_tab():
     }
 
 def draw_drink_management_tray(drink_ui, is_visible, events=None):
-    """Draw the drink management tray if visible"""
+    """Draw the pump test tray if visible"""
     if not is_visible:
-        # WICHTIG: Entferne alle Pump-Labels wenn das Menü nicht sichtbar ist
-        for dropdown in drink_ui['dropdowns']:
-            remove_layer(f'pump_label_{dropdown["pump_number"]}')
         return
-    
-    # Draw gradient background overlay
+
     add_layer(drink_ui['overlay'], drink_ui['tray_rect'], key='drink_overlay')
-    
-    # Draw header section
-    header_rect = pygame.Rect(drink_ui['tray_rect'].x, drink_ui['tray_rect'].y, 
-                             drink_ui['tray_rect'].width, 80)
+
+    header_rect = pygame.Rect(drink_ui['tray_rect'].x, drink_ui['tray_rect'].y,
+                              drink_ui['tray_rect'].width, 70)
     add_layer(drink_ui['header_surface'], header_rect, key='drink_header')
-    
-    # Title drawing removed
-    
-    # Draw pump labels with better styling
-    for dropdown in drink_ui['dropdowns']:
-        # Use static positions for labels to prevent flickering
-        static_label_rect = dropdown['label_text'].get_rect(center=(dropdown['label_rect'].centerx, dropdown['label_rect'].centery))
-        add_layer(dropdown['label_text'], static_label_rect, key=f'pump_label_{dropdown["pump_number"]}')
-    
-    # Note: Custom dropdowns will be drawn after draw_frame() to ensure they're on top
-    
-    # Draw styled generate button with gradient and border
-    button_rect = drink_ui['generate_button_rect']
-    
-    # Button gradient background
-    for i in range(button_rect.height):
-        color_ratio = i / button_rect.height
-        color = (
-            int(40 + (80 - 40) * color_ratio),   # Dark green to lighter green
-            int(120 + (160 - 120) * color_ratio),
-            int(40 + (80 - 40) * color_ratio)
-        )
-        pygame.draw.line(screen, color, 
-                        (button_rect.left, button_rect.top + i), 
-                        (button_rect.right, button_rect.top + i))
-    
-    # Button border and highlight
-    pygame.draw.rect(screen, (100, 200, 100), button_rect, 3)
-    pygame.draw.rect(screen, (150, 220, 150), button_rect, 1)
-    
-    # Button text
-    add_layer(drink_ui['generate_text'], drink_ui['generate_text_rect'], key='generate_text')
-    
-    # Draw favorite and reload buttons
-    # Favorite button
-    pygame.draw.rect(screen, (100, 150, 200), drink_ui['favorite_button_rect'])
-    pygame.draw.rect(screen, (150, 200, 250), drink_ui['favorite_button_rect'], 2)
-    add_layer(drink_ui['favorite_text'], drink_ui['favorite_text_rect'], key='favorite_text')
-    
-    # Reload button
-    pygame.draw.rect(screen, (200, 150, 100), drink_ui['reload_button_rect'])
-    pygame.draw.rect(screen, (250, 200, 150), drink_ui['reload_button_rect'], 2)
-    add_layer(drink_ui['reload_text'], drink_ui['reload_text_rect'], key='reload_text')
+    add_layer(drink_ui['title_text'], (screen_width // 2 - drink_ui['title_text'].get_width() // 2,
+                                       drink_ui['tray_rect'].y + 20), key='drink_title')
+
+    # Temporary surface to draw controls
+    temp_surface = pygame.Surface(screen_size, pygame.SRCALPHA)
+
+    # Pump label
+    temp_surface.blit(drink_ui['pump_label'], (drink_ui['pump_label_rect'].x,
+                                               drink_ui['tray_rect'].y + drink_ui['pump_label_rect'].y))
+
+    # Pump controls
+    pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['pump_minus_rect'])
+    pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['pump_plus_rect'])
+    pygame.draw.rect(temp_surface, (40, 40, 40), drink_ui['pump_value_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['pump_minus_rect'], 2)
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['pump_plus_rect'], 2)
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['pump_value_rect'], 2)
+
+    minus_font = pygame.font.SysFont('Arial', 28, bold=True)
+    plus_font = minus_font
+    val_font = pygame.font.SysFont('Arial', 26, bold=True)
+    minus_text = minus_font.render('-', True, (255, 255, 255))
+    plus_text = plus_font.render('+', True, (255, 255, 255))
+    pump_val_text = val_font.render(str(drink_ui['selected_pump']), True, (255, 255, 255))
+
+    temp_surface.blit(minus_text, minus_text.get_rect(center=drink_ui['pump_minus_rect'].center))
+    temp_surface.blit(plus_text, plus_text.get_rect(center=drink_ui['pump_plus_rect'].center))
+    temp_surface.blit(pump_val_text, pump_val_text.get_rect(center=drink_ui['pump_value_rect'].center))
+
+    # Duration controls
+    temp_surface.blit(drink_ui['dur_label'], (drink_ui['dur_label_rect'].x,
+                                              drink_ui['tray_rect'].y + (drink_ui['dur_label_rect'].y - drink_ui['pump_label_rect'].y)))
+
+    pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['dur_minus_rect'])
+    pygame.draw.rect(temp_surface, (70, 70, 70), drink_ui['dur_plus_rect'])
+    pygame.draw.rect(temp_surface, (40, 40, 40), drink_ui['dur_value_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dur_minus_rect'], 2)
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dur_plus_rect'], 2)
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dur_value_rect'], 2)
+
+    dur_val_text = val_font.render(f"{drink_ui['duration_sec']:.1f}", True, (255, 255, 255))
+    temp_surface.blit(minus_text, minus_text.get_rect(center=drink_ui['dur_minus_rect'].center))
+    temp_surface.blit(plus_text, plus_text.get_rect(center=drink_ui['dur_plus_rect'].center))
+    temp_surface.blit(dur_val_text, dur_val_text.get_rect(center=drink_ui['dur_value_rect'].center))
+
+    # Direction toggle
+    pygame.draw.rect(temp_surface, (100, 100, 100), drink_ui['dir_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['dir_rect'], 2)
+    knob_x = drink_ui['dir_rect'].x + (drink_ui['dir_rect'].width - 18 - 4 if drink_ui['reverse'] else 4)
+    knob_rect = pygame.Rect(knob_x, drink_ui['dir_rect'].y + 4, 18, drink_ui['dir_rect'].height - 8)
+    pygame.draw.rect(temp_surface, (0, 200, 0) if not drink_ui['reverse'] else (200, 100, 100), knob_rect)
+    dir_label_small = pygame.font.SysFont('Arial', 18)
+    dir_text = "Richtung: rückwärts" if drink_ui['reverse'] else "Richtung: vorwärts"
+    dir_text_surf = dir_label_small.render(dir_text, True, (220, 220, 220))
+    dir_text_rect = dir_text_surf.get_rect(center=(screen_width // 2, drink_ui['dir_rect'].y - 18))
+    temp_surface.blit(dir_text_surf, dir_text_rect)
+
+    # Test button
+    pygame.draw.rect(temp_surface, (50, 150, 50) if not drink_ui['testing'] else (120, 120, 120), drink_ui['test_button_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), drink_ui['test_button_rect'], 2)
+    temp_surface.blit(drink_ui['test_text'], drink_ui['test_text_rect'])
+
+    add_layer(temp_surface, (0, 0), key='pump_test_controls')
 
 def _force_remove_pump_labels():
     """Entfernt explizit alle Pump-Labels die als Overlay hängen bleiben könnten"""
@@ -1021,7 +934,7 @@ def _force_remove_pump_labels():
         remove_layer(f'pump_label_{i}')
 
 def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
-    """Animate the drink management tray sliding down or up"""
+    """Animate the pump test tray sliding down or up"""
     clock = pygame.time.Clock()
     start_time = pygame.time.get_ticks()
     tray_height = drink_ui['tray_rect'].height
@@ -1049,16 +962,26 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         
         # Dropdown positions are now static - no more flickering
         
-        # Update generate button position
-        drink_ui['generate_button_rect'].y = current_y + tray_height - 80
-        drink_ui['generate_text_rect'].center = drink_ui['generate_button_rect'].center
-        
-        # Update favorite and reload button positions
-        drink_ui['favorite_button_rect'].y = current_y + tray_height - 35
-        drink_ui['favorite_text_rect'].center = drink_ui['favorite_button_rect'].center
-        
-        drink_ui['reload_button_rect'].y = current_y + tray_height - 35
-        drink_ui['reload_text_rect'].center = drink_ui['reload_button_rect'].center
+        # Update control positions vertically
+        # Pump controls
+        dy = current_y + 30
+        drink_ui['pump_label_rect'].y = dy
+        drink_ui['pump_minus_rect'].y = dy + 20
+        drink_ui['pump_plus_rect'].y = dy + 20
+        drink_ui['pump_value_rect'].y = dy + 20
+
+        # Duration controls
+        dy2 = dy + 80
+        drink_ui['dur_label_rect'].y = dy2
+        drink_ui['dur_minus_rect'].y = dy2 + 20
+        drink_ui['dur_plus_rect'].y = dy2 + 20
+        drink_ui['dur_value_rect'].y = dy2 + 20
+
+        # Direction and button
+        dy3 = dy2 + 80
+        drink_ui['dir_rect'].y = dy3
+        drink_ui['test_button_rect'].y = dy3 + 60
+        drink_ui['test_text_rect'].center = drink_ui['test_button_rect'].center
         
         # No tab layer to update anymore
         
@@ -1070,27 +993,20 @@ def animate_drink_management_tray(drink_ui, drink_tab, show_tray, duration=300):
         clock.tick(60)
 
 def handle_drink_management_interaction(drink_ui, event, event_pos):
-    """Handle interactions with drink management tray elements"""
-    # Check if generate button is clicked
-    if event.type == pygame.MOUSEBUTTONDOWN and drink_ui['generate_button_rect'].collidepoint(event_pos):
-        return 'generate_menu'
-    
-    # Check if favorite button is clicked
-    if event.type == pygame.MOUSEBUTTONDOWN and drink_ui['favorite_button_rect'].collidepoint(event_pos):
-        return 'toggle_favorites'
-    
-    # Check if reload button is clicked
-    if event.type == pygame.MOUSEBUTTONDOWN and drink_ui['reload_button_rect'].collidepoint(event_pos):
-        return 'reload_cocktails'
-    
-    # Handle dropdown interactions
-    for dropdown in drink_ui['dropdowns']:
-        if dropdown['dropdown'].handle_event(event):
-            # Check if selection changed
-            new_value = dropdown['dropdown'].get_selected()
-            if new_value != dropdown['current_value']:
-                return f'dropdown_{dropdown["pump_number"]}_{new_value}'
-    
+    """Handle interactions with pump test tray elements"""
+    if event.type == pygame.MOUSEBUTTONDOWN:
+        if drink_ui['pump_minus_rect'].collidepoint(event_pos):
+            return 'pump_minus'
+        if drink_ui['pump_plus_rect'].collidepoint(event_pos):
+            return 'pump_plus'
+        if drink_ui['dur_minus_rect'].collidepoint(event_pos):
+            return 'dur_minus'
+        if drink_ui['dur_plus_rect'].collidepoint(event_pos):
+            return 'dur_plus'
+        if drink_ui['dir_rect'].collidepoint(event_pos):
+            return 'toggle_dir'
+        if drink_ui['test_button_rect'].collidepoint(event_pos):
+            return 'test_pump'
     return None
 
 def update_dropdown_selection(dropdown, new_value):
@@ -1287,36 +1203,42 @@ def run_interface():
                 # Check if drink management tray is clicked
                 if drink_visible and drink_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_drink_management_interaction(drink_ui, event, event.pos)
-                    if interaction == 'generate_menu':
-                        generating_menu = True
-                        # Start generation in a separate thread
-                        import threading
-                        def generate_thread():
-                            global drink_ui, generating_menu
-                            new_drinks = generate_new_drink_menu()
-                            if new_drinks:
-                                drink_ui = create_drink_management_tray()  # Refresh with new options
-                                logger.info("Drink menu generated successfully")
-                            else:
-                                logger.error("Failed to generate new drink menu")
-                            generating_menu = False
-                        
-                        thread = threading.Thread(target=generate_thread)
-                        thread.start()
-                    elif interaction == 'toggle_favorites':
-                        # Toggle favorites view
-                        from helpers import get_favorite_cocktails
-                        cocktails = get_favorite_cocktails()
-                        current_index = 0
-                        current_cocktail, current_image, current_cocktail_name, previous_image, next_image = load_cocktail(current_index)
-                        logger.info("Switched to favorites view")
-                    elif interaction == 'reload_cocktails':
-                        # Reload cocktails
-                        logger.debug('Reloading cocktails due to reload button press')
-                        cocktails = get_cocktails_with_qr()
-                        current_cocktail, current_image, current_cocktail_name, previous_image, next_image = load_cocktail(current_index)
-                        logger.info("Cocktails reloaded")
-                    continue
+                    if interaction:
+                        if interaction == 'pump_minus':
+                            drink_ui['selected_pump'] = max(1, drink_ui['selected_pump'] - 1)
+                        elif interaction == 'pump_plus':
+                            drink_ui['selected_pump'] = min(12, drink_ui['selected_pump'] + 1)
+                        elif interaction == 'dur_minus':
+                            drink_ui['duration_sec'] = max(0.5, round(drink_ui['duration_sec'] - 0.5, 1))
+                        elif interaction == 'dur_plus':
+                            drink_ui['duration_sec'] = min(60.0, round(drink_ui['duration_sec'] + 0.5, 1))
+                        elif interaction == 'toggle_dir':
+                            drink_ui['reverse'] = not drink_ui['reverse']
+                        elif interaction == 'test_pump' and not drink_ui['testing']:
+                            # Run pump test in a thread to avoid UI blocking
+                            import threading
+                            def run_test():
+                                try:
+                                    drink_ui['testing'] = True
+                                    from controller import setup_gpio, motor_forward, motor_reverse, motor_stop, MOTORS
+                                    setup_gpio()
+                                    pump_index = drink_ui['selected_pump'] - 1
+                                    ia, ib = MOTORS[pump_index]
+                                    if drink_ui['reverse']:
+                                        motor_reverse(ia, ib)
+                                    else:
+                                        motor_forward(ia, ib)
+                                    time.sleep(drink_ui['duration_sec'])
+                                except Exception as e:
+                                    logger.error(f"Pump test failed: {e}")
+                                finally:
+                                    try:
+                                        motor_stop(ia, ib)
+                                    except Exception:
+                                        pass
+                                    drink_ui['testing'] = False
+                            threading.Thread(target=run_test, daemon=True).start()
+                        continue
                 
                 # Check if settings tray is clicked
                 if settings_visible and settings_ui['tray_rect'].collidepoint(event.pos):
@@ -1339,14 +1261,6 @@ def run_interface():
                 # If drink management is visible and clicked outside, close it
                 if drink_visible:
                     drink_visible = False
-                    # Reset dropdown drawing flag when closing
-                    if hasattr(drink_ui, 'dropdowns_drawn'):
-                        del drink_ui['dropdowns_drawn']
-                    # Remove all pump labels when closing
-                    for dropdown in drink_ui['dropdowns']:
-                        remove_layer(f'pump_label_{dropdown["pump_number"]}')
-                    # Zusätzliche Sicherheit: Entferne alle Pump-Labels explizit
-                    _force_remove_pump_labels()
                     animate_drink_management_tray(drink_ui, None, drink_visible)
                     continue
                 
@@ -1642,24 +1556,10 @@ def run_interface():
         
         # No tab positioning needed anymore
         
-        # Draw drink management tray if visible
+        # Draw pump test tray if visible
         if drink_visible:
             draw_drink_management_tray(drink_ui, True, events)
-            
-            # Handle custom dropdown selections
-            for dropdown in drink_ui['dropdowns']:
-                if dropdown['dropdown'].get_selected() != dropdown['current_value']:
-                    new_value = dropdown['dropdown'].get_selected()
-                    update_dropdown_selection(dropdown, new_value)
-            
-            # Show loading animation if generating
-            if generating_menu:
-                loading_font = pygame.font.Font(None, 24)
-                loading_text = loading_font.render("Generating new drink menu...", True, (255, 255, 0))
-                loading_rect = loading_text.get_rect(center=(screen_width // 2, drink_ui['tray_rect'].y + drink_ui['tray_rect'].height - 40))
-                add_layer(loading_text, loading_rect, key='loading_text')
         else:
-            # WICHTIG: Wenn das Menü nicht sichtbar ist, stelle sicher dass alle Pump-Labels entfernt sind
             draw_drink_management_tray(drink_ui, False, events)
         
         # Draw settings tray if visible
@@ -1668,17 +1568,7 @@ def run_interface():
         
         draw_frame()
         
-        # Draw custom dropdowns only once to prevent flickering
-        if drink_visible:
-            # Only draw dropdowns if they haven't been drawn yet
-            if not hasattr(drink_ui, 'dropdowns_drawn'):
-                for dropdown in drink_ui['dropdowns']:
-                    try:
-                        dropdown['dropdown'].draw(screen)
-                    except Exception as e:
-                        logger.error(f"Error drawing dropdown for Pump {dropdown['pump_number']}: {e}")
-                pygame.display.flip()  # Update display after drawing dropdowns
-                drink_ui['dropdowns_drawn'] = True
+        # No dropdowns in pump test tray
         
         clock.tick(120)  # Higher frame rate for smoother interface
     pygame.quit()
