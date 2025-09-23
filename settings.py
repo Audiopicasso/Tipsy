@@ -34,7 +34,7 @@ settings = {
     },
     'PUMP_CONCURRENCY': {
         'parse_method': int,
-        'default': '4'
+        'default': '6'
     }, 
     'RELOAD_COCKTAILS_TIMEOUT': {
         'parse_method': int,
@@ -98,7 +98,7 @@ MEMBRANE_ML_COEFFICIENT = 0.12  # Sekunden pro ml für Membranpumpen (dickere Sc
 RETRACTION_TIME = 0.5  # seconds
 
 # PUMP_CONCURRENCY: How many pumps can run simultaneously
-PUMP_CONCURRENCY = 4
+PUMP_CONCURRENCY = 6
 
 # INVERT_PUMP_PINS: Set to True if your pump motors run in the opposite direction
 INVERT_PUMP_PINS = False

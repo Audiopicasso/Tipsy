@@ -203,7 +203,7 @@ class ExecutorWatcher:
         return True
 
 def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher):
-    executor = concurrent.futures.ThreadPoolExecutor()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=PUMP_CONCURRENCY)
     executor_watcher = ExecutorWatcher()
     factor = 2 if single_or_double.lower() == 'double' else 1
     index = 1
@@ -271,13 +271,10 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         parent_watcher.pours.append(pour)
         executor_watcher.executors.append(executor.submit(pour.run))
 
-        if index % PUMP_CONCURRENCY == 0:
-            while not executor_watcher.done():
-                pass
         index += 1
 
-    while not executor_watcher.done():
-        pass
+    # Warten bis alle gestarteten Pours fertig sind (ohne Busy-Wait)
+    concurrent.futures.wait(executor_watcher.executors)
 
     # Nach dem Cocktail-Zubereiten: Flaschen-Status synchronisieren
     logger.info("Cocktail-Zubereitung abgeschlossen - synchronisiere Flaschen-Status")
