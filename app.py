@@ -378,38 +378,48 @@ with tabs[0]:
     bartender_requests = st.text_area("Enter any special requests for the bartender", height=100)
     clear_cocktails = st.checkbox("Remove existing cocktails from the menu")
 
-    if st.button("Generate Recipes", use_container_width=True):
-        pump_to_drink = {p: d for p, d in pump_inputs.items() if d.strip()}
-        # Speichere extended Konfiguration (inkl. Carbonated)
-        from helpers import save_config_with_carbonation
-        save_config_with_carbonation(pump_to_drink, pump_carbonated)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💾 Konfiguration speichern", use_container_width=True):
+            pump_to_drink = {p: d for p, d in pump_inputs.items() if d.strip()}
+            from helpers import save_config_with_carbonation
+            save_config_with_carbonation(pump_to_drink, pump_carbonated)
+            st.success("✅ Pumpenkonfiguration gespeichert!")
+            st.rerun()
 
-        st.markdown(f'<p style="text-align: center;">Pump configuration saved.</p>', unsafe_allow_html=True)
+    with col2:
+        if st.button("Generate Recipes", use_container_width=True):
+            pump_to_drink = {p: d for p, d in pump_inputs.items() if d.strip()}
+            # Speichere extended Konfiguration (inkl. Carbonated)
+            from helpers import save_config_with_carbonation
+            save_config_with_carbonation(pump_to_drink, pump_carbonated)
 
-        api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
-        cocktails_json = assist.generate_cocktails(pump_to_drink, bartender_requests, not clear_cocktails, api_key=api_key)
-        save_cocktails(cocktails_json, not clear_cocktails)
+            st.markdown(f'<p style="text-align: center;">Pump configuration saved.</p>', unsafe_allow_html=True)
 
-        st.markdown('<h2 style="text-align: center;">Generating Cocktail Logos...</h2>', unsafe_allow_html=True)
-        cocktails = cocktails_json.get("cocktails", [])
-        total = len(cocktails) if cocktails else 1
-        bar = st.progress(0, text="Generating images...")
+            api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
+            cocktails_json = assist.generate_cocktails(pump_to_drink, bartender_requests, not clear_cocktails, api_key=api_key)
+            save_cocktails(cocktails_json, not clear_cocktails)
 
-        for idx, c in enumerate(cocktails):
-            normal_name = c.get("normal_name", "unknown_drink")
-            generate_image(normal_name, False, c.get("ingredients", {}), api_key=api_key)
-            bar.progress((idx + 1) / total)
+            st.markdown('<h2 style="text-align: center;">Generating Cocktail Logos...</h2>', unsafe_allow_html=True)
+            cocktails = cocktails_json.get("cocktails", [])
+            total = len(cocktails) if cocktails else 1
+            bar = st.progress(0, text="Generating images...")
 
-        bar.empty()
-        st.success("Image generation complete.")
-        _send_interface_refresh_signal()
+            for idx, c in enumerate(cocktails):
+                normal_name = c.get("normal_name", "unknown_drink")
+                generate_image(normal_name, False, c.get("ingredients", {}), api_key=api_key)
+                bar.progress((idx + 1) / total)
+
+            bar.empty()
+            st.success("Image generation complete.")
+            _send_interface_refresh_signal()
 
 
 # ================ TAB 2: Settings ================
 with tabs[1]:
     st.title("Settings")
 
-    st.subheader("🔧 Pumpenkalibrierung (alle 12 Membranpumpen)")
+    st.subheader("�� Pumpenkalibrierung (alle 12 Membranpumpen)")
     st.info("💡 Kalibriere hier die Koeffizienten für stille und kohlensäurehaltige Getränke.")
 
     # Membranpumpen Kalibrierung (still)
