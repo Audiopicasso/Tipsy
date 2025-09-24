@@ -342,7 +342,10 @@ with tabs[0]:
 
     def _default_for(pump_name):
         if pump_name in saved_config:
-            return saved_config[pump_name]
+            val = saved_config[pump_name]
+            if isinstance(val, dict):
+                return val.get('ingredient', '')
+            return val
         return "vodka" if pump_name == "Pump 1" else ""
 
     pump_inputs = {}
