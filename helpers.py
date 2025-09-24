@@ -30,6 +30,72 @@ def save_config(data):
         logger.exception('Error saving pump configuration')
 
 
+def save_config_with_carbonation(data, carbonation_map):
+    """Speichert Pumpenkonfiguration inklusive Carbonated-Flags.
+
+    data: {"Pump 1": "gin", ...}
+    carbonation_map: {"Pump 1": True/False, ...}
+    Ergebnisdatei speichert Struktur:
+      {"Pump 1": {"ingredient": "gin", "carbonated": true}, ...}
+    Abwärtskompatibilität: Wenn carbonation_map leer ist, wird das alte Format verwendet.
+    """
+    try:
+        use_extended = any(isinstance(v, bool) for v in carbonation_map.values())
+        if not use_extended:
+            return save_config(data)
+        extended = {}
+        for pump, ingredient in data.items():
+            extended[pump] = {
+                "ingredient": ingredient,
+                "carbonated": bool(carbonation_map.get(pump, False))
+            }
+        with open(settings.CONFIG_FILE, 'w') as f:
+            json.dump(extended, f, indent=2)
+    except Exception:
+        logger.exception('Error saving extended pump configuration')
+
+
+def migrate_pump_config_to_extended():
+    """Migriert eine bestehende pump_config.json ins erweiterte Format.
+
+    Falls Werte als String vorliegen, werden sie in Objekte mit Feldern
+    {"ingredient": <str>, "carbonated": false} umgewandelt.
+    Fehlende carbonated-Felder werden auf false ergänzt.
+    Gibt True zurück, wenn eine Änderung geschrieben wurde, sonst False.
+    """
+    try:
+        if not os.path.exists(settings.CONFIG_FILE):
+            return False
+        with open(settings.CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return False
+        changed = False
+        migrated = {}
+        for pump, val in data.items():
+            if isinstance(val, dict):
+                ingredient = val.get('ingredient')
+                carbonated = val.get('carbonated')
+                if ingredient is None and isinstance(val.get('name'), str):
+                    # sehr alter Schlüsselname -> angleichen
+                    ingredient = val.get('name')
+                if carbonated is None:
+                    val['carbonated'] = False
+                    changed = True
+                migrated[pump] = {'ingredient': ingredient or '', 'carbonated': bool(val.get('carbonated', False))}
+            else:
+                # String-Format -> migrieren
+                migrated[pump] = {'ingredient': str(val), 'carbonated': False}
+                changed = True
+        if changed:
+            with open(settings.CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(migrated, f, indent=2, ensure_ascii=False)
+        return changed
+    except Exception:
+        logger.exception('Error migrating pump configuration to extended format')
+        return False
+
+
 def load_cocktails():
     if os.path.exists(settings.COCKTAILS_FILE):
         try:

@@ -133,24 +133,20 @@ class Pour:
 
         # Verwende pumpenspezifischen Kalibrierungskoeffizienten
         pump_number = self.pump_index + 1  # pump_index ist 0-basiert, aber wir brauchen 1-basierte Nummer
-        pump_coefficient = get_pump_coefficient(pump_number)
+        # Nutze ggf. kohlensäure-Koeffizienten
+        carbonated = getattr(self, 'carbonated', False)
+        pump_coefficient = get_pump_coefficient(pump_number, carbonated=carbonated)
 
         # Berechne Pumpzeit basierend auf pumpenspezifischem Koeffizienten
         seconds_to_pour = self.amount * pump_coefficient
 
-        if RETRACTION_TIME:
-            logger.debug(f'Retraction time is set to {RETRACTION_TIME:.2f} seconds. Adding this time to pour time')
-            seconds_to_pour = seconds_to_pour + RETRACTION_TIME
+        # Kein Retract mehr: Membranpumpen können nicht rückwärts laufen
 
-        logger.info(f'Pouring {self.amount} ml of Pump {pump_number} (Type: {"Peristaltic" if pump_number in PERISTALTIC_PUMPS else "Membrane"}) for {seconds_to_pour:.2f} seconds using coefficient {pump_coefficient:.4f}.')
+        logger.info(f'Pouring {self.amount} ml of Pump {pump_number} for {seconds_to_pour:.2f} seconds using coefficient {pump_coefficient:.4f} (carbonated={carbonated}).')
         motor_forward(ia, ib)
         time.sleep(seconds_to_pour)
 
-        # Nur bei peristaltischen Pumpen Retract durchführen (Membranpumpen können nicht reversen)
-        if RETRACTION_TIME and pump_number in PERISTALTIC_PUMPS:
-            logger.info(f'Retracting Pump {pump_number} for {RETRACTION_TIME:.2f} seconds (peristaltic only)')
-            motor_reverse(ia, ib)
-            time.sleep(RETRACTION_TIME)
+        # Retract entfällt vollständig
 
         motor_stop(ia, ib)
         self.running = False
@@ -175,14 +171,13 @@ def prime_pumps(duration=10):
 
 def clean_pumps(duration=10):
     """
-    Reverse each pump for `duration` seconds (one after another),
-    e.g. for cleaning lines.
+    Run each pump forward for `duration` seconds (one after another) to flush/clean lines.
     """
     setup_gpio()
     try:
         for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Reversing pump {index} for {duration} seconds (cleaning)...')
-            motor_reverse(ia, ib)
+            logger.info(f'Flushing pump {index} forward for {duration} seconds (cleaning)...')
+            motor_forward(ia, ib)
             time.sleep(duration)
             motor_stop(ia, ib)
     finally:
@@ -190,7 +185,7 @@ def clean_pumps(duration=10):
             # GPIO cleanup not needed with gpiozero
             pass
         else:
-            logger.debug('clean_pumps() complete no GPIO cleanup in debug mode.')
+            logger.debug('clean_pumps() complete — no GPIO cleanup in debug mode.')
 
 class ExecutorWatcher:
 
@@ -245,11 +240,19 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
 
     # Jetzt alle Zutaten ausgeben
     for ingredient_name, ml_needed in ingredients_to_pour:
-        # find a matching pump label in pump_config
+        # find a matching pump label in pump_config (supports legacy and extended formats)
         chosen_pump = None
-        for pump_label, config_ing_name in pump_config.items():
-            if config_ing_name.strip().lower() == ingredient_name.strip().lower():
-                chosen_pump = pump_label
+        for pump_label, config_entry in pump_config.items():
+            # extended format: { "ingredient": "gin", "carbonated": true }
+            if isinstance(config_entry, dict):
+                config_ing_name = config_entry.get('ingredient', '')
+                is_carbonated = bool(config_entry.get('carbonated', False))
+            else:
+                config_ing_name = config_entry
+                is_carbonated = False
+
+            if str(config_ing_name).strip().lower() == ingredient_name.strip().lower():
+                chosen_pump = (pump_label, is_carbonated)
                 break
 
         if not chosen_pump:
@@ -258,7 +261,8 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
 
         # parse 'Pump 1' -> index=0
         try:
-            pump_num_str = chosen_pump.replace('Pump', '').strip()
+            pump_label = chosen_pump[0] if isinstance(chosen_pump, tuple) else chosen_pump
+            pump_num_str = pump_label.replace('Pump', '').strip()
             pump_index = int(pump_num_str) - 1
         except ValueError:
             logger.critical(f'Could not parse pump label "{chosen_pump}". Skipping.')
@@ -268,7 +272,13 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
             logger.critical(f'Pump index {pump_index} out of range for "{ingredient_name}". Skipping.')
             continue
 
+        # Carbonation-Flag ermitteln
+        carbonated_flag = False
+        if isinstance(chosen_pump, tuple):
+            carbonated_flag = bool(chosen_pump[1])
+
         pour = Pour(pump_index, ml_needed, ingredient_name)
+        pour.carbonated = carbonated_flag
         parent_watcher.pours.append(pour)
         executor_watcher.executors.append(executor.submit(pour.run))
 

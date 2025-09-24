@@ -519,7 +519,7 @@ def create_settings_tray():
     
     # Switch label
     switch_font = pygame.font.SysFont(None, 24)
-    switch_label = switch_font.render("Reverse Pump Direction", True, (255, 255, 255))
+    switch_label = switch_font.render("Invert Pump Pins", True, (255, 255, 255))
     switch_label_rect = switch_label.get_rect(center=(screen_width // 2, switch_y - 20))
     
     # Streamlit app access info

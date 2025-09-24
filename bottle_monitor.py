@@ -54,12 +54,17 @@ class BottleMonitor:
         
         # Generiere Flaschen-Konfiguration basierend auf den konfigurierten Pumpen
         bottles_config = {}
-        for pump_name, ingredient in pump_config.items():
-            if ingredient and ingredient.strip():
+        for pump_name, entry in pump_config.items():
+            # Unterstützt alte und neue Formate
+            if isinstance(entry, dict):
+                ingredient = entry.get('ingredient', '')
+            else:
+                ingredient = entry
+            if ingredient and str(ingredient).strip():
                 # Konvertiere ingredient zu bottle_id (kleinbuchstaben, keine Leerzeichen)
-                bottle_id = ingredient.strip().lower().replace(' ', '_')
+                bottle_id = str(ingredient).strip().lower().replace(' ', '_')
                 bottles_config[bottle_id] = {
-                    "name": ingredient.strip(),
+                    "name": str(ingredient).strip(),
                     "capacity_ml": 1000,  # Standard 1L Flasche
                     "current_ml": 1000,   # Standard voll
                     "warning_threshold_ml": 200,  # Warnung bei 200ml
@@ -178,10 +183,15 @@ class BottleMonitor:
         
         # Neue Flaschen-Konfiguration generieren
         bottles_config = {}
-        for pump_name, ingredient in pump_config.items():
-            if ingredient and ingredient.strip():
+        for pump_name, entry in pump_config.items():
+            # Unterstützt alte und neue Formate
+            if isinstance(entry, dict):
+                ingredient = entry.get('ingredient', '')
+            else:
+                ingredient = entry
+            if ingredient and str(ingredient).strip():
                 # Verwende das zentrale Ingredient Mapping
-                ingredient_key = ingredient.strip().lower()
+                ingredient_key = str(ingredient).strip().lower()
                 bottle_id = ingredient_mapping.get(ingredient_key, ingredient_key.replace(' ', '_'))
                 
                 # Prüfe, ob die Flasche bereits existiert

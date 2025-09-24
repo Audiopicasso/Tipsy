@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Importiere Controller-Funktionen
 try:
-    from controller import setup_gpio, motor_forward, motor_stop, motor_reverse, MOTORS
+    from controller import setup_gpio, motor_forward, motor_stop, MOTORS
     from settings import PERISTALTIC_PUMPS, MEMBRANE_PUMPS, get_pump_coefficient
     DEBUG = False
 except ImportError as e:
@@ -33,7 +33,7 @@ def print_pump_info():
     print("-" * 40)
     
     for i, (ia, ib) in enumerate(MOTORS, 1):
-        pump_type = "Peristaltisch" if i in PERISTALTIC_PUMPS else "Membran"
+        pump_type = "Membran"
         coefficient = get_pump_coefficient(i)
         time_for_50ml = coefficient * 50
         
@@ -41,10 +41,9 @@ def print_pump_info():
               f"50ml in {time_for_50ml:5.1f}s | Koeff: {coefficient:.4f} s/ml")
     
     print("\n💡 Pumpentypen:")
-    print(f"   Peristaltische Pumpen: {', '.join(map(str, PERISTALTIC_PUMPS))}")
-    print(f"   Membranpumpen:         {', '.join(map(str, MEMBRANE_PUMPS))}")
+    print("   Alle 12 Pumpen sind Membranpumpen")
 
-def test_single_pump(pump_number, duration, direction="forward"):
+def test_single_pump(pump_number, duration):
     """Testet eine einzelne Pumpe"""
     if pump_number < 1 or pump_number > len(MOTORS):
         print(f"❌ Ungültige Pumpennummer: {pump_number}")
@@ -52,12 +51,12 @@ def test_single_pump(pump_number, duration, direction="forward"):
     
     pump_index = pump_number - 1
     ia, ib = MOTORS[pump_index]
-    pump_type = "Peristaltisch" if pump_number in PERISTALTIC_PUMPS else "Membran"
+    pump_type = "Membran"
     coefficient = get_pump_coefficient(pump_number)
     
     print(f"\n🔄 Teste Pumpe {pump_number} ({pump_type})")
     print(f"   GPIO-Pins: ({ia}, {ib})")
-    print(f"   Richtung: {direction}")
+    print(f"   Richtung: forward")
     print(f"   Dauer: {duration} Sekunden")
     print(f"   Aktueller Koeffizient: {coefficient:.4f} s/ml")
     print(f"   Erwartete Menge: {duration / coefficient:.1f} ml")
@@ -67,10 +66,7 @@ def test_single_pump(pump_number, duration, direction="forward"):
             setup_gpio()
             
             print(f"   ⏱️  Starte Pumpe...")
-            if direction == "forward":
-                motor_forward(ia, ib)
-            elif direction == "reverse":
-                motor_reverse(ia, ib)
+            motor_forward(ia, ib)
             
             time.sleep(duration)
             motor_stop(ia, ib)
@@ -90,7 +86,7 @@ def calibration_test(pump_number, test_duration=10):
         print(f"❌ Ungültige Pumpennummer: {pump_number}")
         return
     
-    pump_type = "Peristaltisch" if pump_number in PERISTALTIC_PUMPS else "Membran"
+    pump_type = "Membran"
     coefficient = get_pump_coefficient(pump_number)
     
     print(f"\n🧪 KALIBRIERUNGSTEST - Pumpe {pump_number} ({pump_type})")
@@ -158,14 +154,8 @@ def save_calibration(pump_number, new_coefficient):
         with open(settings_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Bestimme welcher Koeffizient aktualisiert werden soll
-        if pump_number in PERISTALTIC_PUMPS:
-            setting_name = "PERISTALTIC_ML_COEFFICIENT"
-        elif pump_number in MEMBRANE_PUMPS:
-            setting_name = "MEMBRANE_ML_COEFFICIENT"
-        else:
-            print("   ❌ Unbekannter Pumpentyp")
-            return
+        # Alle Pumpen sind Membranpumpen
+        setting_name = "MEMBRANE_ML_COEFFICIENT"
         
         # Ersetze den Koeffizienten
         import re
@@ -193,7 +183,7 @@ def interactive_menu():
         print("🎯 HAUPTMENÜ")
         print("="*60)
         print("1. Pumpen-Übersicht anzeigen")
-        print("2. Einzelne Pumpe testen")
+        print("2. Einzelne Pumpe testen (vorwärts)")
         print("3. Kalibrierungstest durchführen")
         print("4. Alle Pumpen primen (10s)")
         print("5. Alle Pumpen reinigen (10s)")
@@ -211,8 +201,7 @@ def interactive_menu():
                 try:
                     pump_num = int(input("Pumpennummer (1-12): "))
                     duration = float(input("Dauer in Sekunden: "))
-                    direction = input("Richtung (forward/reverse) [forward]: ").strip() or "forward"
-                    test_single_pump(pump_num, duration, direction)
+                    test_single_pump(pump_num, duration)
                 except ValueError:
                     print("❌ Ungültige Eingabe")
             elif choice == "3":
@@ -229,11 +218,11 @@ def interactive_menu():
                     time.sleep(1)  # Kurze Pause zwischen Pumpen
                 print("✅ Alle Pumpen geprimt")
             elif choice == "5":
-                print("🧹 Reinige alle Pumpen für 10 Sekunden...")
+                print("🧹 Spüle alle Pumpen für 10 Sekunden vorwärts...")
                 for i in range(1, 13):
-                    test_single_pump(i, 10, "reverse")
+                    test_single_pump(i, 10)
                     time.sleep(1)  # Kurze Pause zwischen Pumpen
-                print("✅ Alle Pumpen gereinigt")
+                print("✅ Alle Pumpen gespült")
             else:
                 print("❌ Ungültige Option")
                 

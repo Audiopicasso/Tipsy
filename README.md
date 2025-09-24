@@ -175,25 +175,21 @@ Several settings can be configured via environment variables, or in a .env file.
 * FULL_SCREEN: Set to 'false' to disable full screen mode for the PyGame interface. Useful for debugging.
 * SHOW_RELOAD_COCKTAILS_BUTTON: Set to 'true' to show a reload button for manually reloading the list of cocktails
 * RELOAD_COCKTAILS_TIMEOUT: Set to a number of milliseconds to automatically reload the list of cocktails that often.
-* RETRACTION_TIME: Set to a number of seconds to reverse the motors at the end of a pour. This should help prevent buildup on the ends of the tubing.
+* RETRACTION_TIME: Deprecated/disabled. Membrane pumps cannot reverse; no retract after pour.
 * USE_GPT_TRANSPARENCY: Set to 'true' to enable native image transparency in OpenAI. This should produce more consistent image results. This uses the `gpt-image-1` model. Your organization must be verified to use the model `gpt-image-1`. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization. If you just verified, it can take up to 15 minutes for access to propagate.
 
 ---
 
 ## Pump Calibration
 
-The Tipsy Cocktail Mixer features **two different pump types** that require independent calibration:
-
-### Pump Types
-- **Peristaltic Pumps (1-6)**: Very thin tubing, slower flow rate, suitable for spirits and syrups
-- **Membrane Pumps (7-12)**: Thicker tubing, faster flow rate, suitable for juices and carbonated beverages
+All 12 pumps are membrane pumps and share a single calibration coefficient.
 
 ### Calibration Methods
 
 #### 1. Web Interface (Streamlit)
 Access the Settings tab in the Streamlit app to:
-- Set separate calibration coefficients for each pump type
-- View current calibration values
+- Set the membrane calibration coefficient (applies to all pumps)
+- View current calibration value
 - Use the calibration calculator for precise adjustments
 - Test individual pumps
 
@@ -205,9 +201,9 @@ python pump_test.py
 
 **Features:**
 - Interactive pump testing and calibration
-- Individual pump control (forward/reverse)
+- Individual pump control (forward only)
 - Calibration test with automatic coefficient calculation
-- Pump priming and cleaning functions
+- Pump priming and cleaning (forward flush) functions
 - Real-time pump status monitoring
 
 ### Calibration Process
@@ -223,9 +219,8 @@ python pump_test.py
 - Input: 20.0 seconds
 
 ### Calibration Coefficients
-- **PERISTALTIC_ML_COEFFICIENT**: Seconds per ml for peristaltic pumps (1-6)
-- **MEMBRANE_ML_COEFFICIENT**: Seconds per ml for membrane pumps (7-12)
-- **ML_COEFFICIENT**: Legacy setting (replaced by specific coefficients)
+- **MEMBRANE_ML_COEFFICIENT**: Seconds per ml for membrane pumps (1-12)
+- **ML_COEFFICIENT**: Legacy setting (unused)
 
 ### Tips for Accurate Calibration
 - Perform calibration tests with different durations for consistency
