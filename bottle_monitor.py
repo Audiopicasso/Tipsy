@@ -534,6 +534,17 @@ class BottleMonitor:
             "overall_percentage": round(overall_percentage, 1)
         }
     
+    def save_config(self):
+        """Speichert die aktuelle Flaschen-Konfiguration in die Datei"""
+        try:
+            config_data = {"bottles": self.bottles}
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Flaschen-Konfiguration gespeichert: {len(self.bottles)} Flaschen")
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern der Flaschen-Konfiguration: {e}")
+            raise
+
     def force_reload_config(self):
         """Lädt die Flaschen-Konfiguration neu und synchronisiert sie"""
         logger.info("Erzwinge Neuladen der Flaschen-Konfiguration")

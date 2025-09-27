@@ -94,30 +94,31 @@ if DEBUG:
 
 # ===================== PUMP CALIBRATION =====================
 
-# ML_COEFFICIENT: How many seconds to pump 1ml of liquid (Legacy - wird durch spezifische Koeffizienten ersetzt)
-# Example: If it takes 8 seconds to pump 50ml, then ML_COEFFICIENT = 8.0 / 50.0 = 0.16
-ML_COEFFICIENT = 0.16  # Sekunden pro ml
+# Lade gespeicherte Kalibrierungswerte aus der Datei (falls vorhanden)
+def _load_calibration_from_file():
+    """Lädt Kalibrierungswerte aus der settings.py Datei selbst"""
+    try:
+        import re
+        with open(__file__, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Suche nach gespeicherten Werten in der Datei
+        membrane_match = re.search(r'# SAVED: MEMBRANE_ML_COEFFICIENT = ([\d.]+)', content)
+        carbonated_match = re.search(r'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = ([\d.]+)', content)
+        
+        if membrane_match:
+            globals()['MEMBRANE_ML_COEFFICIENT'] = float(membrane_match.group(1))
+        if carbonated_match:
+            globals()['CARBONATED_MEMBRANE_ML_COEFFICIENT'] = float(carbonated_match.group(1))
+            
+    except Exception as e:
+        logger.debug(f"Konnte gespeicherte Kalibrierungswerte nicht laden: {e}")
 
-# PERISTALTIC_ML_COEFFICIENT: Kalibrierung für peristaltische Pumpen (Pumpen 1-6)
-# Beispiel: Wenn es 12 Sekunden braucht, um 50ml zu pumpen, dann PERISTALTIC_ML_COEFFICIENT = 12.0 / 50.0 = 0.24
-PERISTALTIC_ML_COEFFICIENT = 0.24  # Sekunden pro ml für peristaltische Pumpen (dünne Schläuche, langsam)
+# Lade gespeicherte Werte
+_load_calibration_from_file()
 
-# MEMBRANE_ML_COEFFICIENT: Kalibrierung für Membranpumpen (Pumpen 7-12)
-# Beispiel: Wenn es 6 Sekunden braucht, um 50ml zu pumpen, dann MEMBRANE_ML_COEFFICIENT = 6.0 / 50.0 = 0.12
-MEMBRANE_ML_COEFFICIENT = 0.12  # Sekunden pro ml für Membranpumpen (dickere Schläuche, schnell)
-
-# CARBONATED_MEMBRANE_ML_COEFFICIENT: Kalibrierung für kohlensäurehaltige Getränke auf Membranpumpen
-# Beispiel: ca. 8 ml/s => 0.125 s/ml
-CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.125
-
-# RETRACTION_TIME: Retract/Reverse ist für Membranpumpen deaktiviert
-RETRACTION_TIME = 0.0  # seconds (deaktiviert)
-
-# PUMP_CONCURRENCY: How many pumps can run simultaneously
-PUMP_CONCURRENCY = 6
-
-# INVERT_PUMP_PINS: Set to True if your pump motors run in the opposite direction
-INVERT_PUMP_PINS = False
+# SAVED: MEMBRANE_ML_COEFFICIENT = 0.0735
+# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.125
 
 # Pumpentypen: Alle 12 Pumpen sind Membranpumpen; peristaltische Pumpen entfallen
 PERISTALTIC_PUMPS = []

@@ -458,9 +458,8 @@ with tabs[1]:
                     content = f.read()
                 import re
                 # Ersetze MEMBRANE_ML_COEFFICIENT
-                content = re.sub(r'MEMBRANE_ML_COEFFICIENT = \d+\.?\d*', f'MEMBRANE_ML_COEFFICIENT = {membrane_coefficient:.4f}', content)
-                # Setze PERISTALTIC_ML_COEFFICIENT optional gleich, um alte Codepfade unkritisch zu halten
-                content = re.sub(r'PERISTALTIC_ML_COEFFICIENT = \d+\.?\d*', f'PERISTALTIC_ML_COEFFICIENT = {membrane_coefficient:.4f}', content)
+                # Speichere in SAVED-Kommentaren für persistente Speicherung
+                content = re.sub(r'# SAVED: MEMBRANE_ML_COEFFICIENT = [\d.]+', f'# SAVED: MEMBRANE_ML_COEFFICIENT = {membrane_coefficient:.4f}', content)
                 with open(settings_file, 'w', encoding='utf-8') as f:
                     f.write(content)
                 st.success(f"✅ Kalibrierung (still) gespeichert: {membrane_ml_coefficient}s für 50ml ({membrane_coefficient:.4f}s/ml)")
@@ -492,7 +491,7 @@ with tabs[1]:
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 import re
-                content = re.sub(r'CARBONATED_MEMBRANE_ML_COEFFICIENT = \d+\.?\d*', f'CARBONATED_MEMBRANE_ML_COEFFICIENT = {carbon_coefficient:.4f}', content)
+                content = re.sub(r'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = [\d.]+', f'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = {carbon_coefficient:.4f}', content)
                 with open(settings_file, 'w', encoding='utf-8') as f:
                     f.write(content)
                 st.success(f"✅ Kalibrierung (CO₂) gespeichert: {carbon_ml_coefficient}s für 50ml ({carbon_coefficient:.4f}s/ml)")
@@ -570,8 +569,7 @@ with tabs[1]:
                 if settings_file.exists():
                     content = settings_file.read_text(encoding='utf-8')
                     import re
-                    content = re.sub(r'MEMBRANE_ML_COEFFICIENT = \d+\.?\d*', f'MEMBRANE_ML_COEFFICIENT = {coeff_calc:.4f}', content)
-                    content = re.sub(r'PERISTALTIC_ML_COEFFICIENT = \d+\.?\d*', f'PERISTALTIC_ML_COEFFICIENT = {coeff_calc:.4f}', content)
+                    content = re.sub(r'# SAVED: MEMBRANE_ML_COEFFICIENT = [\d.]+', f'# SAVED: MEMBRANE_ML_COEFFICIENT = {coeff_calc:.4f}', content)
                     settings_file.write_text(content, encoding='utf-8')
                     st.success("✅ Kalibrierung (still) gespeichert")
             except Exception as e:
@@ -583,7 +581,7 @@ with tabs[1]:
                 if settings_file.exists():
                     content = settings_file.read_text(encoding='utf-8')
                     import re
-                    content = re.sub(r'CARBONATED_MEMBRANE_ML_COEFFICIENT = \d+\.?\d*', f'CARBONATED_MEMBRANE_ML_COEFFICIENT = {coeff_calc:.4f}', content)
+                    content = re.sub(r'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = [\d.]+', f'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = {coeff_calc:.4f}', content)
                     settings_file.write_text(content, encoding='utf-8')
                     st.success("✅ Kalibrierung (CO₂) gespeichert")
             except Exception as e:
