@@ -1223,7 +1223,7 @@ def run_interface():
                     elif interaction == 'prime_pumps':
                         # Import and call prime_pumps function
                         from controller import prime_pumps
-                        prime_pumps(duration=10)
+                        prime_pumps(duration=2)
                     elif interaction == 'clean_pumps':
                         # Import and call clean_pumps function
                         from controller import clean_pumps

@@ -204,18 +204,64 @@ class Pour:
         motor_stop(ia, ib)
         self.running = False
 
-def prime_pumps(duration=10):
+def prime_pumps(duration=2):
     """
-    Primes each pump for `duration` seconds in sequence (one after another).
+    Primes all pumps with assigned ingredients simultaneously for `duration` seconds.
     """
-    setup_gpio()
+    import json
+    
+    # Lade Pumpen-Konfiguration
     try:
-        for index, (ia, ib) in enumerate(MOTORS, start=1):
-            logger.info(f'Priming pump {index} for {duration} seconds...')
+        with open('pump_config.json', 'r') as f:
+            pump_config = json.load(f)
+    except Exception as e:
+        logger.error(f'Could not load pump config: {e}')
+        return
+    
+    setup_gpio()
+    
+    # Sammle alle Pumpen mit zugeordneten Zutaten
+    active_pumps = []
+    for pump_label, config in pump_config.items():
+        if isinstance(config, dict) and config.get('ingredient', '').strip():
+            try:
+                pump_num = int(pump_label.replace('Pump', '').strip())
+                pump_index = pump_num - 1
+                if 0 <= pump_index < len(MOTORS):
+                    ia, ib = MOTORS[pump_index]
+                    active_pumps.append((pump_num, ia, ib, config['ingredient']))
+            except (ValueError, IndexError) as e:
+                logger.warning(f'Could not parse pump {pump_label}: {e}')
+    
+    if not active_pumps:
+        logger.info('No pumps with assigned ingredients found for priming')
+        return
+    
+    try:
+        # Starte alle aktiven Pumpen gleichzeitig
+        logger.info(f'Priming {len(active_pumps)} pumps simultaneously for {duration} seconds...')
+        for pump_num, ia, ib, ingredient in active_pumps:
+            logger.info(f'Starting pump {pump_num} ({ingredient})')
             motor_forward(ia, ib)
-            time.sleep(duration)
+        
+        # Warte die angegebene Zeit
+        time.sleep(duration)
+        
+        # Stoppe alle Pumpen gleichzeitig
+        for pump_num, ia, ib, ingredient in active_pumps:
+            logger.info(f'Stopping pump {pump_num} ({ingredient})')
             motor_stop(ia, ib)
+            
+        logger.info('Priming complete')
+        
     finally:
+        # Sicherheitshalber alle Pumpen stoppen
+        for pump_num, ia, ib, ingredient in active_pumps:
+            try:
+                motor_stop(ia, ib)
+            except Exception as e:
+                logger.error(f'Error stopping pump {pump_num}: {e}')
+        
         if not DEBUG:
             # GPIO cleanup not needed with gpiozero
             pass
