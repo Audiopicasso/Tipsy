@@ -117,8 +117,8 @@ def _load_calibration_from_file():
 # Lade gespeicherte Werte
 _load_calibration_from_file()
 
-# SAVED: MEMBRANE_ML_COEFFICIENT = 0.0735
-# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.125
+# SAVED: MEMBRANE_ML_COEFFICIENT = 0.0740
+# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.0740
 
 # Pumpentypen: Alle 12 Pumpen sind Membranpumpen; peristaltische Pumpen entfallen
 PERISTALTIC_PUMPS = []

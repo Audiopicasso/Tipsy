@@ -1,6 +1,6 @@
 {
   "bottles": {
-    "rum_weiss": {
+    "rum_weiÃ": {
       "name": "Rum (weiß)",
       "capacity_ml": 1000,
       "current_ml": 940.0,
@@ -10,7 +10,7 @@
     "wodka": {
       "name": "Wodka",
       "capacity_ml": 1000,
-      "current_ml": 800.0,
+      "current_ml": 512.7272727272727,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
@@ -28,7 +28,7 @@
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
-    "pfirsichlikoer": {
+    "pfirsichlikÃ¶r": {
       "name": "Pfirsichlikör",
       "capacity_ml": 1000,
       "current_ml": 920.0,
@@ -52,14 +52,14 @@
     "orangensaft": {
       "name": "Orangensaft",
       "capacity_ml": 1000,
-      "current_ml": 900.0,
+      "current_ml": 792.2727272727273,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
     "tonic_water": {
       "name": "Tonic Water",
       "capacity_ml": 1000,
-      "current_ml": 700.0,
+      "current_ml": 520.4545454545455,
       "warning_threshold_ml": 200.0,
       "critical_threshold_ml": 100.0
     },
@@ -80,7 +80,7 @@
     "cranberrysaft": {
       "name": "Cranberrysaft",
       "capacity_ml": 1000,
-      "current_ml": 1000,
+      "current_ml": 784.5454545454545,
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     }

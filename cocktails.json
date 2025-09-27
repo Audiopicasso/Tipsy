@@ -1,63 +1,43 @@
 {
   "cocktails": [
     {
-      "normal_name": "Tropical Rum Punch",
-      "fun_name": "Island Vibes",
+      "normal_name": "Cranberry Vodka Splash",
+      "fun_name": "Berry Blast Off",
       "ingredients": {
-        "Rum (weiss)": "60 ml",
-        "Pfirsichlikoer": "30 ml",
-        "Grenadinensirup": "15 ml",
-        "Limettensaft": "20 ml",
-        "Orangensaft": "100 ml"
+        "Wodka": "80 ml",
+        "Cranberrysaft": "60 ml",
+        "Orangensaft": "30 ml",
+        "Tonic Water": "50 ml"
       }
     },
     {
-      "normal_name": "Peach Vodka Fizz",
-      "fun_name": "Fuzzy Delight",
-      "ingredients": {
-        "Wodka": "50 ml",
-        "Pfirsichlikoer": "25 ml",
-        "Sprite": "150 ml",
-        "Limettensaft": "15 ml"
-      }
-    },
-    {
-      "normal_name": "Classic Gin and Tonic",
-      "fun_name": "Herbal Spritz",
+      "normal_name": "Gin and Tonic",
+      "fun_name": "Gino's Sparkler",
       "ingredients": {
         "Gin": "50 ml",
-        "Tonic Water": "150 ml",
-        "Limettensaft": "10 ml"
+        "Tonic Water": "130 ml",
+        "Cranberrysaft": "20 ml",
+        "Orangensaft": "20 ml"
       }
     },
     {
-      "normal_name": "Cranberry Tequila Sunrise",
-      "fun_name": "Sunset Splash",
+      "normal_name": "Screwdriver",
+      "fun_name": "Sunny Twist",
       "ingredients": {
-        "Tequila": "50 ml",
-        "Cranberrysaft": "100 ml",
-        "Grenadinensirup": "10 ml",
-        "Limettensaft": "15 ml"
+        "Wodka": "70 ml",
+        "Orangensaft": "100 ml",
+        "Cranberrysaft": "30 ml",
+        "Tonic Water": "20 ml"
       }
     },
     {
-      "normal_name": "Citrus Vodka Cooler",
-      "fun_name": "Zesty Breeze",
+      "normal_name": "Cranberry Gin Fizz",
+      "fun_name": "Fizzing Delight",
       "ingredients": {
-        "Wodka": "40 ml",
-        "Limettensaft": "20 ml",
-        "Orangensaft": "80 ml",
-        "Sprite": "100 ml"
-      }
-    },
-    {
-      "normal_name": "Triple Sec Berry Burst",
-      "fun_name": "Berry Bliss",
-      "ingredients": {
-        "Triple Sec": "30 ml",
-        "Cranberrysaft": "50 ml",
-        "Limettensaft": "20 ml",
-        "Grenadinensirup": "5 ml"
+        "Gin": "60 ml",
+        "Cranberrysaft": "70 ml",
+        "Tonic Water": "60 ml",
+        "Orangensaft": "20 ml"
       }
     }
   ]

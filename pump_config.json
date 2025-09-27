@@ -1,14 +1,22 @@
 {
-  "Pump 1": "Rum (weiss)",
-  "Pump 2": "Wodka",
-  "Pump 3": "Gin",
-  "Pump 4": "Tequila",
-  "Pump 5": "Pfirsichlikoer",
-  "Pump 6": "Grenadinensirup",
-  "Pump 7": "Limettensaft",
-  "Pump 8": "Orangensaft",
-  "Pump 9": "Tonic Water",
-  "Pump 10": "Sprite",
-  "Pump 11": "Triple Sec",
-  "Pump 12": "Cranberrysaft"
+  "Pump 1": {
+    "ingredient": "Wodka",
+    "carbonated": false
+  },
+  "Pump 2": {
+    "ingredient": "Cranberrysaft",
+    "carbonated": false
+  },
+  "Pump 3": {
+    "ingredient": "Orangensaft",
+    "carbonated": false
+  },
+  "Pump 5": {
+    "ingredient": "Gin",
+    "carbonated": false
+  },
+  "Pump 6": {
+    "ingredient": "Tonic Water",
+    "carbonated": false
+  }
 }
