@@ -172,7 +172,7 @@ def motor_reverse(ia, ib):
 
 class Pour:
     def __str__(self):
-        return f'{self.ingredient_name}: {self.amount} ml.'
+        return f'{self.ingredient_name}: {round(self.amount)} ml.'
 
     def __init__(self, pump_index, amount, ingredient_name):
         self.pump_index = pump_index
