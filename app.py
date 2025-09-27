@@ -405,7 +405,9 @@ with tabs[0]:
             st.markdown(f'<p style="text-align: center;">Pump configuration saved.</p>', unsafe_allow_html=True)
 
             api_key = st.session_state.get("openai_api_key") or OPENAI_API_KEY
-            cocktails_json = assist.generate_cocktails(pump_to_drink, bartender_requests, not clear_cocktails, api_key=api_key)
+            # Verwende die konfigurierte kleine Cocktail-Größe für GPT-Prompt
+            target_volume = st.session_state.get("small_cocktail_size", 220)
+            cocktails_json = assist.generate_cocktails(pump_to_drink, target_volume, bartender_requests, not clear_cocktails, api_key=api_key)
             save_cocktails(cocktails_json, not clear_cocktails)
 
             st.markdown('<h2 style="text-align: center;">Generating Cocktail Logos...</h2>', unsafe_allow_html=True)
@@ -586,18 +588,6 @@ with tabs[1]:
                     st.success("✅ Kalibrierung (CO₂) gespeichert")
             except Exception as e:
                 st.error(f"❌ Fehler beim Speichern: {e}")
-        try:
-            settings_file = Path("settings.py")
-            if settings_file.exists():
-                content = settings_file.read_text(encoding='utf-8')
-                import re
-                content = re.sub(r'MEMBRANE_ML_COEFFICIENT = \d+\.?\d*', f'MEMBRANE_ML_COEFFICIENT = {coeff_calc:.4f}', content)
-                # Optional auch PERISTALTIC_ML_COEFFICIENT spiegeln, um Altpfade konsistent zu halten
-                content = re.sub(r'PERISTALTIC_ML_COEFFICIENT = \d+\.?\d*', f'PERISTALTIC_ML_COEFFICIENT = {coeff_calc:.4f}', content)
-                settings_file.write_text(content, encoding='utf-8')
-                st.success("✅ Membran-Kalibrierung gespeichert")
-        except Exception as e:
-            st.error(f"❌ Fehler beim Speichern: {e}")
 
     if st.button("Prime Pumps", use_container_width=True):
         st.info("Priming all pumps for 10 seconds each...")
@@ -606,6 +596,59 @@ with tabs[1]:
             st.success("Pumps primed successfully!")
         except Exception as e:
             st.error(f"Error priming pumps: {e}")
+
+    # ===================== COCKTAIL-GRÖßEN KONFIGURATION =====================
+    st.markdown("---")
+    st.subheader("🍹 Cocktail-Größen Konfiguration")
+    st.info("💡 Definiere die Zielvolumina für kleine und große Cocktails. Der kleine Wert wird auch für GPT-Rezeptgenerierung verwendet.")
+
+    size_col1, size_col2 = st.columns(2)
+    
+    with size_col1:
+        small_size = st.number_input(
+            "Kleiner Cocktail (ml)",
+            min_value=100,
+            max_value=500,
+            value=220,
+            step=10,
+            help="Zielvolumen für kleine Cocktails. Wird auch als Basis für GPT-Rezeptgenerierung verwendet.",
+            key="small_cocktail_size"
+        )
+        
+    with size_col2:
+        large_size = st.number_input(
+            "Großer Cocktail (ml)",
+            min_value=200,
+            max_value=800,
+            value=350,
+            step=10,
+            help="Zielvolumen für große Cocktails.",
+            key="large_cocktail_size"
+        )
+
+    # Zeige Verhältnis an
+    if small_size > 0:
+        ratio = large_size / small_size
+        st.metric(
+            "Größenverhältnis (Groß/Klein)",
+            f"{ratio:.2f}x",
+            help=f"Ein großer Cocktail ist {ratio:.2f}x so groß wie ein kleiner"
+        )
+
+    if st.button("💾 Cocktail-Größen speichern", use_container_width=True, key="save_cocktail_sizes"):
+        try:
+            settings_file = Path("settings.py")
+            if settings_file.exists():
+                content = settings_file.read_text(encoding='utf-8')
+                import re
+                content = re.sub(r"'SMALL_COCKTAIL_SIZE_ML': \{\s*'parse_method': int,\s*'default': '\d+'\s*\}", 
+                               f"'SMALL_COCKTAIL_SIZE_ML': {{'parse_method': int, 'default': '{small_size}'}}", content)
+                content = re.sub(r"'LARGE_COCKTAIL_SIZE_ML': \{\s*'parse_method': int,\s*'default': '\d+'\s*\}", 
+                               f"'LARGE_COCKTAIL_SIZE_ML': {{'parse_method': int, 'default': '{large_size}'}}", content)
+                settings_file.write_text(content, encoding='utf-8')
+                st.success(f"✅ Cocktail-Größen gespeichert: Klein={small_size}ml, Groß={large_size}ml")
+        except Exception as e:
+            st.error(f"❌ Fehler beim Speichern: {e}")
 
     st.subheader("Clean Pumps")
     if st.button("Clean Pumps", use_container_width=True):

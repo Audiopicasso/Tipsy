@@ -251,10 +251,44 @@ class ExecutorWatcher:
             return False
         return True
 
+def calculate_volume_scaling(ingredients, target_volume_ml):
+    """Berechnet den Skalierungsfaktor basierend auf Zielvolumen"""
+    # Berechne aktuelles Gesamtvolumen des Rezepts
+    current_total = 0
+    for ingredient_name, measurement_str in ingredients.items():
+        parts = measurement_str.split()
+        if parts:
+            try:
+                ml_amount = float(parts[0])
+                current_total += ml_amount
+            except ValueError:
+                continue
+    
+    if current_total <= 0:
+        return 1.0
+    
+    # Berechne Skalierungsfaktor
+    scaling_factor = target_volume_ml / current_total
+    return scaling_factor
+
 def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher):
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=PUMP_CONCURRENCY)
     executor_watcher = ExecutorWatcher()
-    factor = 2 if single_or_double.lower() == 'double' else 1
+    
+    # Importiere Settings für Cocktail-Größen
+    from settings import SMALL_COCKTAIL_SIZE_ML, LARGE_COCKTAIL_SIZE_ML
+    
+    # Bestimme Zielvolumen basierend auf Größe
+    if single_or_double.lower() == 'double':
+        target_volume_ml = LARGE_COCKTAIL_SIZE_ML
+    else:
+        target_volume_ml = SMALL_COCKTAIL_SIZE_ML
+    
+    # Berechne Skalierungsfaktor basierend auf Zielvolumen
+    scaling_factor = calculate_volume_scaling(ingredients, target_volume_ml)
+    
+    logger.info(f'Cocktail-Größe: {single_or_double}, Zielvolumen: {target_volume_ml}ml, Skalierungsfaktor: {scaling_factor:.3f}')
+    
     index = 1
 
     # Überprüfe zuerst alle Flaschen-Füllstände
@@ -270,7 +304,7 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
             logger.critical(f'Cannot parse numeric amount "{parts[0]}" for {ingredient_name}. Skipping.')
             continue
 
-        ml_needed = ml_amount * factor
+        ml_needed = ml_amount * scaling_factor
 
         # Überprüfe Flaschen-Füllstand
         # Erstelle Flaschen-ID automatisch aus Zutatennamen (normalisiert)

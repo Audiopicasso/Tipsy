@@ -17,7 +17,7 @@ def get_client(api_key: str | None = None):
     return OpenAI(api_key=api_key or settings.OPENAI_API_KEY)
 
 
-def generate_cocktails(pump_to_drink: dict, requests_for_bartender: str = '', exclude_existing: bool = True, api_key: str | None = None) -> dict:
+def generate_cocktails(pump_to_drink: dict, target_volume_ml: int = 220, requests_for_bartender: str = '', exclude_existing: bool = True, api_key: str | None = None) -> dict:
     """Generate a JSON list of cocktails using German ingredient names from pump config"""
     
     # Extrahiere deutsche Zutatennamen aus der Pumpen-Konfiguration
@@ -34,8 +34,13 @@ def generate_cocktails(pump_to_drink: dict, requests_for_bartender: str = '', ex
     prompt = (
         'You are a creative cocktail mixologist. Based on the following pump configuration, '
         'generate a list of cocktail recipes. For each cocktail, provide a normal cocktail name, '
-        'a fun cocktail name, and a dictionary of ingredients (with their measurements, e.g., "50 ml").\n\n'
-        f'IMPORTANT: Use ONLY these exact ingredient names from the pump configuration: {", ".join(available_ingredients)}\n\n'
+        'a fun cocktail name, and a dictionary of ingredients (with their measurements in ml).\n\n'
+        'IMPORTANT CONSTRAINTS:\n'
+        f'- Use ONLY these exact ingredient names from the pump configuration: {", ".join(available_ingredients)}\n'
+        f'- Each cocktail should have a TOTAL VOLUME of approximately {target_volume_ml}ml (±20ml)\n'
+        '- Balance the ingredients so the total adds up to this target volume\n'
+        '- Preferrably generate recipes for common and well known cocktails, which proved to be good tasting and work with the provided ingredients.\n'
+        '- All measurements must be in ml (e.g., "50 ml")\n\n'
         'Please output only valid JSON that follows this format:\n\n'
         '{\n'
         '  "cocktails": [\n'

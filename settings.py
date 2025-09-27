@@ -71,6 +71,14 @@ settings = {
     'ALLOW_FAVORITES': {
         'parse_method': json.loads,
         'default': 'false'
+    },
+    'SMALL_COCKTAIL_SIZE_ML': {
+        'parse_method': int,
+        'default': '220'
+    },
+    'LARGE_COCKTAIL_SIZE_ML': {
+        'parse_method': int,
+        'default': '350'
     }
 }
 for name in settings:
