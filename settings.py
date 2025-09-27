@@ -127,7 +127,7 @@ loaded_calibration = _load_calibration_from_file()
 
 # Setze nur Fallback-Werte für nicht geladene Variablen
 if 'MEMBRANE_ML_COEFFICIENT' not in loaded_calibration and 'MEMBRANE_ML_COEFFICIENT' not in globals():
-    MEMBRANE_ML_COEFFICIENT = 0.16
+    MEMBRANE_ML_COEFFICIENT = 0.0740
     logger.warning("Verwende Fallback-Wert für MEMBRANE_ML_COEFFICIENT: 0.16")
 
 if 'CARBONATED_MEMBRANE_ML_COEFFICIENT' not in loaded_calibration and 'CARBONATED_MEMBRANE_ML_COEFFICIENT' not in globals():
