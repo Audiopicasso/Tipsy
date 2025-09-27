@@ -23,13 +23,65 @@ if not DEBUG:
         logger.error(f'GPIO-Initialisierung fehlgeschlagen: {e}')
         logger.info('Pump control will be disabled')
 
-def get_bottle_id_from_ingredient(ingredient_name):
+def normalize_all_bottle_ids():
     """
-    Erstellt automatisch eine Flaschen-ID aus dem Zutatennamen.
-    Normalisiert den Namen für Flaschen-IDs (ohne Leerzeichen, mit Unterstrichen).
+    Normalisiert alle Flaschen-IDs in der bottle_config.json automatisch.
+    Diese Funktion sollte beim Start der Anwendung aufgerufen werden.
     """
+    try:
+        import json
+        from bottle_monitor import bottle_monitor
+        
+        # Lade aktuelle Konfiguration
+        bottles = bottle_monitor.get_all_bottles()
+        if not bottles:
+            logger.info("Keine Flaschen gefunden - Überspringe Normalisierung")
+            return
+        
+        # Normalisiere alle Flaschen-IDs
+        normalized_bottles = {}
+        changes_made = False
+        
+        for old_bottle_id, bottle_data in bottles.items():
+            # Normalisiere die Flaschen-ID
+            new_bottle_id = normalize_bottle_id(bottle_data.get('name', old_bottle_id))
+            
+            if new_bottle_id != old_bottle_id:
+                logger.info(f"Normalisiere Flaschen-ID: '{old_bottle_id}' -> '{new_bottle_id}'")
+                changes_made = True
+            
+            normalized_bottles[new_bottle_id] = bottle_data
+        
+        # Speichere nur wenn Änderungen gemacht wurden
+        if changes_made:
+            # Aktualisiere die bottle_monitor Konfiguration
+            bottle_monitor.bottles = normalized_bottles
+            bottle_monitor.save_config()
+            logger.info("Flaschen-IDs erfolgreich normalisiert und gespeichert")
+        else:
+            logger.info("Alle Flaschen-IDs sind bereits normalisiert")
+            
+    except Exception as e:
+        logger.error(f"Fehler beim Normalisieren der Flaschen-IDs: {e}")
+
+def normalize_bottle_id(ingredient_name):
+    """
+    Normalisiert einen Zutatennamen zu einer konsistenten Flaschen-ID.
+    Diese Funktion wird überall verwendet, um sicherzustellen, dass alle
+    Flaschen-IDs einheitlich normalisiert sind.
+    """
+    if not ingredient_name:
+        return ""
+        
     # Normalisiere den Namen für Flaschen-ID
     bottle_id = ingredient_name.lower().strip()
+    
+    # Konvertiere Unicode-Escapes zu echten Umlauten falls vorhanden
+    try:
+        bottle_id = bottle_id.encode().decode('unicode_escape')
+    except:
+        pass  # Falls es kein Unicode-Escape ist, ignoriere den Fehler
+    
     # Ersetze Leerzeichen mit Unterstrichen
     bottle_id = bottle_id.replace(' ', '_')
     # Entferne Klammern und deren Inhalt
@@ -38,6 +90,13 @@ def get_bottle_id_from_ingredient(ingredient_name):
     bottle_id = bottle_id.replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('ß', 'ss')
     
     return bottle_id
+
+def get_bottle_id_from_ingredient(ingredient_name):
+    """
+    Erstellt automatisch eine Flaschen-ID aus dem Zutatennamen.
+    Verwendet die zentrale normalize_bottle_id Funktion.
+    """
+    return normalize_bottle_id(ingredient_name)
 
 # Define GPIO pins for each motor here (same as your test).
 # Adjust these if needed to match your hardware.
@@ -214,8 +273,8 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         ml_needed = ml_amount * factor
 
         # Überprüfe Flaschen-Füllstand
-        # Erstelle Flaschen-ID automatisch aus Zutatennamen
-        bottle_id = get_bottle_id_from_ingredient(ingredient_name)
+        # Erstelle Flaschen-ID automatisch aus Zutatennamen (normalisiert)
+        bottle_id = normalize_bottle_id(ingredient_name)
 
         logger.info(f'Überprüfe Flasche: {ingredient_name} -> bottle_id: {bottle_id}, benötigt: {ml_needed:.1f}ml')
 

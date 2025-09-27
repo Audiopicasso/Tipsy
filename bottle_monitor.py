@@ -19,9 +19,18 @@ class BottleMonitor:
         
     def _get_ingredient_mapping(self) -> Dict[str, str]:
         """Zentrale Ingredient Mapping Funktion für konsistente Flaschen-IDs"""
-        return {
-            "rum (weiß)": "rum_(weiß)",
-            "rum (weiss)": "rum_(weiß)",  # Alternative Schreibweise
+        # Importiere die normalize_bottle_id Funktion
+        try:
+            from controller import normalize_bottle_id
+        except ImportError:
+            # Fallback falls controller nicht verfügbar
+            def normalize_bottle_id(name):
+                return name.lower().strip().replace(' ', '_').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('ß', 'ss')
+        
+        # Erstelle Mapping mit normalisierten IDs
+        raw_mappings = {
+            "rum (weiß)": "rum (weiß)",
+            "rum (weiss)": "rum (weiß)",  # Alternative Schreibweise
             "wodka": "wodka",
             "gin": "gin",
             "tequila": "tequila",
@@ -30,15 +39,22 @@ class BottleMonitor:
             "grenadinensirup": "grenadinensirup",
             "limettensaft": "limettensaft",
             "orangensaft": "orangensaft",
-            "tonic water": "tonic_water",
+            "tonic water": "tonic water",
             "sprite": "sprite",
-            "triple sec": "triple_sec",
+            "triple sec": "triple sec",
             "cranberrysaft": "cranberrysaft",
             "cranberry juice": "cranberrysaft",
             "lime juice": "limettensaft",
             "lemon juice": "limettensaft",
             "orange juice": "orangensaft"
         }
+        
+        # Normalisiere alle Werte
+        normalized_mappings = {}
+        for key, value in raw_mappings.items():
+            normalized_mappings[key] = normalize_bottle_id(value)
+        
+        return normalized_mappings
         
     def _load_bottle_config(self) -> Dict:
         """Lädt die Flaschen-Konfiguration basierend auf der Pumpen-Konfiguration"""
@@ -190,9 +206,16 @@ class BottleMonitor:
             else:
                 ingredient = entry
             if ingredient and str(ingredient).strip():
-                # Verwende das zentrale Ingredient Mapping
+                # Verwende das zentrale Ingredient Mapping mit Normalisierung
+                try:
+                    from controller import normalize_bottle_id
+                except ImportError:
+                    # Fallback falls controller nicht verfügbar
+                    def normalize_bottle_id(name):
+                        return name.lower().strip().replace(' ', '_').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('ß', 'ss')
+                
                 ingredient_key = str(ingredient).strip().lower()
-                bottle_id = ingredient_mapping.get(ingredient_key, ingredient_key.replace(' ', '_'))
+                bottle_id = ingredient_mapping.get(ingredient_key, normalize_bottle_id(ingredient))
                 
                 # Prüfe, ob die Flasche bereits existiert
                 existing_bottle = self.bottles.get("bottles", {}).get(bottle_id)
@@ -460,8 +483,15 @@ class BottleMonitor:
         
         for ingredient_name, amount_ml in ingredients:
             # Verwende das Ingredient Mapping, um die korrekte Flaschen-ID zu finden
+            try:
+                from controller import normalize_bottle_id
+            except ImportError:
+                # Fallback falls controller nicht verfügbar
+                def normalize_bottle_id(name):
+                    return name.lower().strip().replace(' ', '_').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('ß', 'ss')
+            
             ingredient_key = ingredient_name.lower().strip()
-            bottle_id = ingredient_mapping.get(ingredient_key, ingredient_key.replace(' ', '_'))
+            bottle_id = ingredient_mapping.get(ingredient_key, normalize_bottle_id(ingredient_name))
             
             logger.debug(f"Checking ingredient: '{ingredient_name}' -> key: '{ingredient_key}' -> bottle_id: '{bottle_id}'")
             

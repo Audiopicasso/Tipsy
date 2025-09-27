@@ -318,6 +318,14 @@ if "image_update_timestamp" not in st.session_state:
 
 from helpers import migrate_pump_config_to_extended
 migrate_pump_config_to_extended()
+
+# Normalisiere alle Flaschen-IDs beim Start
+try:
+    from controller import normalize_all_bottle_ids
+    normalize_all_bottle_ids()
+except Exception as e:
+    st.warning(f"Warnung: Flaschen-ID-Normalisierung fehlgeschlagen: {e}")
+
 saved_config = load_saved_config()
 cocktail_data = _load_cocktails()
 

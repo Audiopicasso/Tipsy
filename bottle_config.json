@@ -1,6 +1,6 @@
 {
   "bottles": {
-    "rum_(weiß)": {
+    "rum_weiss": {
       "name": "Rum (weiß)",
       "capacity_ml": 1000,
       "current_ml": 940.0,
@@ -28,7 +28,7 @@
       "warning_threshold_ml": 200,
       "critical_threshold_ml": 100
     },
-    "pfirsichlikör": {
+    "pfirsichlikoer": {
       "name": "Pfirsichlikör",
       "capacity_ml": 1000,
       "current_ml": 920.0,
