@@ -502,6 +502,9 @@ with tabs[1]:
     st.markdown("---")
     st.markdown("### 📊 Aktuelle Kalibrierungswerte")
     try:
+        # Importiere die aktuellen Kalibrierungswerte
+        from settings import MEMBRANE_ML_COEFFICIENT, CARBONATED_MEMBRANE_ML_COEFFICIENT
+        
         col_a, col_b = st.columns(2)
         with col_a:
             st.metric(

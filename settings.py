@@ -87,9 +87,9 @@ for name in settings:
     except (ValueError, json.decoder.JSONDecodeError, TypeError):
         # logger.exception(f'invalid ENV value for {name}')
         value = settings[name]['parse_method'](settings[name]['default'])
-    exec(f'{name} = value')
+    globals()[name] = value
 
-if DEBUG:
+if globals().get('DEBUG', False):
     logging.basicConfig(level=logging.DEBUG)
 
 # ===================== PUMP CALIBRATION =====================
@@ -97,6 +97,7 @@ if DEBUG:
 # Lade gespeicherte Kalibrierungswerte aus der Datei (falls vorhanden)
 def _load_calibration_from_file():
     """Lädt Kalibrierungswerte aus der settings.py Datei selbst"""
+    loaded_values = {}
     try:
         import re
         with open(__file__, 'r', encoding='utf-8') as f:
@@ -107,15 +108,37 @@ def _load_calibration_from_file():
         carbonated_match = re.search(r'# SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = ([\d.]+)', content)
         
         if membrane_match:
-            globals()['MEMBRANE_ML_COEFFICIENT'] = float(membrane_match.group(1))
+            value = float(membrane_match.group(1))
+            globals()['MEMBRANE_ML_COEFFICIENT'] = value
+            loaded_values['MEMBRANE_ML_COEFFICIENT'] = value
+            
         if carbonated_match:
-            globals()['CARBONATED_MEMBRANE_ML_COEFFICIENT'] = float(carbonated_match.group(1))
+            value = float(carbonated_match.group(1))
+            globals()['CARBONATED_MEMBRANE_ML_COEFFICIENT'] = value
+            loaded_values['CARBONATED_MEMBRANE_ML_COEFFICIENT'] = value
             
     except Exception as e:
         logger.debug(f"Konnte gespeicherte Kalibrierungswerte nicht laden: {e}")
+    
+    return loaded_values
 
-# Lade gespeicherte Werte
-_load_calibration_from_file()
+# Lade gespeicherte Werte zuerst
+loaded_calibration = _load_calibration_from_file()
+
+# Setze nur Fallback-Werte für nicht geladene Variablen
+if 'MEMBRANE_ML_COEFFICIENT' not in loaded_calibration and 'MEMBRANE_ML_COEFFICIENT' not in globals():
+    MEMBRANE_ML_COEFFICIENT = 0.16
+    logger.warning("Verwende Fallback-Wert für MEMBRANE_ML_COEFFICIENT: 0.16")
+
+if 'CARBONATED_MEMBRANE_ML_COEFFICIENT' not in loaded_calibration and 'CARBONATED_MEMBRANE_ML_COEFFICIENT' not in globals():
+    CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.125
+    logger.warning("Verwende Fallback-Wert für CARBONATED_MEMBRANE_ML_COEFFICIENT: 0.125")
+
+# Legacy-Werte (nur falls nicht vorhanden)
+if 'PERISTALTIC_ML_COEFFICIENT' not in globals():
+    PERISTALTIC_ML_COEFFICIENT = 0.24
+if 'ML_COEFFICIENT' not in globals():
+    ML_COEFFICIENT = 0.16
 
 # SAVED: MEMBRANE_ML_COEFFICIENT = 0.0740
 # SAVED: CARBONATED_MEMBRANE_ML_COEFFICIENT = 0.0740

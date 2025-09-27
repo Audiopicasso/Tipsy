@@ -143,23 +143,98 @@ def get_valid_cocktails():
             cocktails.append(cocktail)
     return cocktails
 
+def get_available_cocktails():
+    """Get the list of cocktails that have images AND can be made with current bottle levels."""
+    from bottle_monitor import bottle_monitor
+    
+    cocktail_data = load_cocktails().get('cocktails', [])
+    available_cocktails = []
+    
+    for cocktail in cocktail_data:
+        # Prüfe zuerst, ob ein Bild existiert
+        if not os.path.exists(get_cocktail_image_path(cocktail)):
+            continue
+            
+        # Prüfe dann, ob alle Zutaten verfügbar sind
+        ingredients = cocktail.get("ingredients", {})
+        if not ingredients:
+            continue
+            
+        try:
+            # Konvertiere Zutaten in das Format für can_make_cocktail
+            ingredient_list = []
+            for ingredient_name, measurement_str in ingredients.items():
+                parts = measurement_str.split()
+                if parts:
+                    try:
+                        ml_amount = float(parts[0])
+                        ingredient_list.append((ingredient_name.lower(), ml_amount))
+                    except ValueError:
+                        # Überspringe Zutaten mit ungültigen Mengenangaben
+                        continue
+            
+            # Prüfe Verfügbarkeit mit Bottle-Monitor
+            can_make, missing_ingredients = bottle_monitor.can_make_cocktail(ingredient_list)
+            
+            if can_make:
+                available_cocktails.append(cocktail)
+                
+        except Exception as e:
+            # Bei Fehlern überspringe den Cocktail sicherheitshalber
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Fehler beim Prüfen der Verfügbarkeit von {cocktail.get('normal_name', 'Unknown')}: {e}")
+            continue
+    
+    return available_cocktails
+
 
 def favorite_cocktail(cocktail_index):
     """Mark a cocktail as a favorite. Returns the new index of the cocktail"""
-    cocktails = get_valid_cocktails()
+    cocktails = get_available_cocktails()  # Verwende sichere Filterung
+    if cocktail_index >= len(cocktails):
+        return cocktail_index  # Index außerhalb des Bereichs
     cocktail = cocktails[cocktail_index]
     cocktail['favorite'] = True
-    save_cocktails({'cocktails': cocktails}, append=False)
-    return get_valid_cocktails().index(cocktail)
+    
+    # Speichere in der vollständigen Cocktail-Liste
+    all_cocktails = load_cocktails().get('cocktails', [])
+    for i, c in enumerate(all_cocktails):
+        if c.get('normal_name') == cocktail.get('normal_name'):
+            all_cocktails[i]['favorite'] = True
+            break
+    save_cocktails({'cocktails': all_cocktails}, append=False)
+    
+    # Gib neuen Index in der gefilterten Liste zurück
+    updated_cocktails = get_available_cocktails()
+    for i, c in enumerate(updated_cocktails):
+        if c.get('normal_name') == cocktail.get('normal_name'):
+            return i
+    return cocktail_index
 
 
 def unfavorite_cocktail(cocktail_index):
     """Unmark a cocktail as a favorite. Returns the new index of the cocktail"""
-    cocktails = get_valid_cocktails()
+    cocktails = get_available_cocktails()  # Verwende sichere Filterung
+    if cocktail_index >= len(cocktails):
+        return cocktail_index  # Index außerhalb des Bereichs
     cocktail = cocktails[cocktail_index]
     cocktail['favorite'] = False
-    save_cocktails({'cocktails': cocktails}, append=False)
-    return get_valid_cocktails().index(cocktail)
+    
+    # Speichere in der vollständigen Cocktail-Liste
+    all_cocktails = load_cocktails().get('cocktails', [])
+    for i, c in enumerate(all_cocktails):
+        if c.get('normal_name') == cocktail.get('normal_name'):
+            all_cocktails[i]['favorite'] = False
+            break
+    save_cocktails({'cocktails': all_cocktails}, append=False)
+    
+    # Gib neuen Index in der gefilterten Liste zurück
+    updated_cocktails = get_available_cocktails()
+    for i, c in enumerate(updated_cocktails):
+        if c.get('normal_name') == cocktail.get('normal_name'):
+            return i
+    return cocktail_index
 
 
 def save_base64_image(base64_string, output_path):

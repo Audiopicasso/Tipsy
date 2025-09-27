@@ -11,7 +11,7 @@ from settings import *
 from bottle_monitor import bottle_monitor
 
 # GPIO-Initialisierung mit gpiozero
-if not DEBUG:
+if not globals().get('DEBUG', False):
     try:
         from gpiozero import DigitalOutputDevice
         logger.info('gpiozero erfolgreich geladen - Pi 5 kompatibel')
@@ -272,11 +272,11 @@ def calculate_volume_scaling(ingredients, target_volume_ml):
     return scaling_factor
 
 def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher):
+    # Importiere Settings für Cocktail-Größen und PUMP_CONCURRENCY
+    from settings import SMALL_COCKTAIL_SIZE_ML, LARGE_COCKTAIL_SIZE_ML, PUMP_CONCURRENCY
+    
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=PUMP_CONCURRENCY)
     executor_watcher = ExecutorWatcher()
-    
-    # Importiere Settings für Cocktail-Größen
-    from settings import SMALL_COCKTAIL_SIZE_ML, LARGE_COCKTAIL_SIZE_ML
     
     # Bestimme Zielvolumen basierend auf Größe
     if single_or_double.lower() == 'double':

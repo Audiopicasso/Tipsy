@@ -18,7 +18,7 @@ ALLOW_FAVORITES = True  # Enable/disable favorite functionality
 SHOW_RELOAD_COCKTAILS_BUTTON = True  # Show/hide reload cocktails button
 RELOAD_COCKTAILS_TIMEOUT = None  # Auto-reload timeout (None = disabled)
 CONFIG_FILE = "pump_config.json"  # Pump configuration file
-from helpers import get_cocktail_image_path, get_valid_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
+from helpers import get_cocktail_image_path, get_valid_cocktails, get_available_cocktails, wrap_text, favorite_cocktail, unfavorite_cocktail
 from controller import make_drink
 
 import logging
@@ -231,10 +231,20 @@ def create_qr_code_slide():
     return qr_cocktail
 
 def get_cocktails_with_qr():
-    """Get valid cocktails and add QR code slide at the end"""
-    cocktails = get_valid_cocktails()
+    """Get available cocktails (with bottle monitoring) and add QR code slide at the end"""
+    cocktails = get_available_cocktails()  # Verwende sichere Filterung
+    
+    # Fallback: Wenn keine Cocktails verfügbar sind, zeige trotzdem QR-Code
+    if not cocktails:
+        logger.warning("Keine Cocktails verfügbar - alle Zutaten sind aufgebraucht oder fehlen!")
+        # Zeige nur QR-Code Slide
+        qr_cocktail = create_qr_code_slide()
+        return [qr_cocktail]
+    
+    # Normale Situation: Verfügbare Cocktails + QR-Code
     qr_cocktail = create_qr_code_slide()
     cocktails.append(qr_cocktail)
+    logger.info(f"Interface zeigt {len(cocktails)-1} verfügbare Cocktails + QR-Code")
     return cocktails
 
 def check_for_refresh_signal():
@@ -1004,6 +1014,7 @@ def update_dropdown_selection(dropdown, new_value):
 def generate_new_drink_menu():
     """Generate a new drink menu using OpenAI"""
     import openai
+    from settings import OPENAI_API_KEY
     
     if not OPENAI_API_KEY:
         logger.error("OpenAI API key not found")
