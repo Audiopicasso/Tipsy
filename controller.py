@@ -23,27 +23,21 @@ if not DEBUG:
         logger.error(f'GPIO-Initialisierung fehlgeschlagen: {e}')
         logger.info('Pump control will be disabled')
 
-# Ingredient Mapping: Cocktail-Zutaten zu Flaschen-IDs
-INGREDIENT_MAPPING = {
-    "rum (weiß)": "rum_(weiß)",
-    "rum (weiss)": "rum_(weiß)",  # Alternative Schreibweise
-    "wodka": "wodka",
-    "gin": "gin",
-    "tequila": "tequila",
-    "pfirsichlikör": "pfirsichlikör",
-    "pfirsichlikoer": "pfirsichlikör",  # Alternative Schreibweise ohne Umlaut
-    "grenadinensirup": "grenadinensirup",
-    "limettensaft": "limettensaft",
-    "orangensaft": "orangensaft",
-    "tonic water": "tonic_water",
-    "sprite": "sprite",
-    "triple sec": "triple_sec",
-    "cranberrysaft": "cranberrysaft",
-    "cranberry juice": "cranberrysaft",
-    "lime juice": "limettensaft",
-    "lemon juice": "limettensaft",
-    "orange juice": "orangensaft"
-}
+def get_bottle_id_from_ingredient(ingredient_name):
+    """
+    Erstellt automatisch eine Flaschen-ID aus dem Zutatennamen.
+    Normalisiert den Namen für Flaschen-IDs (ohne Leerzeichen, mit Unterstrichen).
+    """
+    # Normalisiere den Namen für Flaschen-ID
+    bottle_id = ingredient_name.lower().strip()
+    # Ersetze Leerzeichen mit Unterstrichen
+    bottle_id = bottle_id.replace(' ', '_')
+    # Entferne Klammern und deren Inhalt
+    bottle_id = bottle_id.replace('(', '').replace(')', '')
+    # Ersetze Umlaute für bessere Kompatibilität
+    bottle_id = bottle_id.replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('ß', 'ss')
+    
+    return bottle_id
 
 # Define GPIO pins for each motor here (same as your test).
 # Adjust these if needed to match your hardware.
@@ -220,11 +214,10 @@ def pour_ingredients(ingredients, single_or_double, pump_config, parent_watcher)
         ml_needed = ml_amount * factor
 
         # Überprüfe Flaschen-Füllstand
-        # Verwende das Ingredient Mapping, um die korrekte Flaschen-ID zu finden
-        ingredient_key = ingredient_name.lower().strip()
-        bottle_id = INGREDIENT_MAPPING.get(ingredient_key, ingredient_key.replace(' ', '_'))
+        # Erstelle Flaschen-ID automatisch aus Zutatennamen
+        bottle_id = get_bottle_id_from_ingredient(ingredient_name)
 
-        logger.info(f'Überprüfe Flasche: {ingredient_name} -> ingredient_key: {ingredient_key} -> bottle_id: {bottle_id}, benötigt: {ml_needed:.1f}ml')
+        logger.info(f'Überprüfe Flasche: {ingredient_name} -> bottle_id: {bottle_id}, benötigt: {ml_needed:.1f}ml')
 
         if not bottle_monitor.consume_liquid(bottle_id, ml_needed):
             logger.error(f'Flasche {ingredient_name} (ID: {bottle_id}) hat nicht genug Flüssigkeit für {ml_needed:.1f}ml')

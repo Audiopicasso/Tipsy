@@ -18,11 +18,24 @@ def get_client(api_key: str | None = None):
 
 
 def generate_cocktails(pump_to_drink: dict, requests_for_bartender: str = '', exclude_existing: bool = True, api_key: str | None = None) -> dict:
-    """Generate a JSON list of cocktails"""
+    """Generate a JSON list of cocktails using German ingredient names from pump config"""
+    
+    # Extrahiere deutsche Zutatennamen aus der Pumpen-Konfiguration
+    available_ingredients = []
+    for pump_label, config_entry in pump_to_drink.items():
+        if isinstance(config_entry, dict):
+            ingredient = config_entry.get('ingredient', '')
+        else:
+            ingredient = config_entry
+        
+        if ingredient:
+            available_ingredients.append(ingredient)
+    
     prompt = (
         'You are a creative cocktail mixologist. Based on the following pump configuration, '
         'generate a list of cocktail recipes. For each cocktail, provide a normal cocktail name, '
         'a fun cocktail name, and a dictionary of ingredients (with their measurements, e.g., "50 ml").\n\n'
+        f'IMPORTANT: Use ONLY these exact ingredient names from the pump configuration: {", ".join(available_ingredients)}\n\n'
         'Please output only valid JSON that follows this format:\n\n'
         '{\n'
         '  "cocktails": [\n'
@@ -32,7 +45,7 @@ def generate_cocktails(pump_to_drink: dict, requests_for_bartender: str = '', ex
         '      "ingredients": {\n'
         '        "Tequila": "50 ml",\n'
         '        "Triple Sec": "25 ml",\n'
-        '        "Lime Juice": "25 ml"\n'
+        '        "Limettensaft": "25 ml"\n'
         '      }\n'
         '    }\n'
         '  ]\n'
@@ -59,7 +72,8 @@ def generate_cocktails(pump_to_drink: dict, requests_for_bartender: str = '', ex
                     'role': 'system',
                     'content': (
                         'You are a creative cocktail mixologist. Generate cocktail recipes in JSON format. '
-                        'Make sure your entire response is a valid JSON object.'
+                        'Make sure your entire response is a valid JSON object. '
+                        f'Use ONLY these ingredient names: {", ".join(available_ingredients)}'
                     )
                 },
                 {'role': 'user', 'content': prompt}

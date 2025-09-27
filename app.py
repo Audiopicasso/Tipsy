@@ -937,7 +937,29 @@ with tabs[2]:
                         if st.button("Pour", key=f"pour_{safe_c}", use_container_width=True):
                             note = st.info(f"Pouring a single serving of {norm} ...")
                             try:
+                                # Debug: Zeige Rezept-Details
+                                with st.expander("🔍 Debug-Informationen", expanded=False):
+                                    st.write("**Rezept:**")
+                                    st.json(c)
+                                    
+                                    # Lade aktuelle Pumpen-Konfiguration
+                                    import json
+                                    with open('pump_config.json', 'r') as f:
+                                        pump_config = json.load(f)
+                                    st.write("**Pumpen-Konfiguration:**")
+                                    st.json(pump_config)
+                                    
+                                    # Zeige Zutaten-Matching
+                                    st.write("**Zutaten-Matching:**")
+                                    for ingredient in c.get('ingredients', {}):
+                                        st.write(f"• {ingredient}")
+                                
                                 executor_watcher = controller.make_drink(c, single_or_double="single")
+                                
+                                if executor_watcher is None:
+                                    st.error("❌ make_drink() hat None zurückgegeben - Rezept konnte nicht verarbeitet werden")
+                                    st.stop()
+                                
                                 while not executor_watcher.done():
                                     pass
                                 
