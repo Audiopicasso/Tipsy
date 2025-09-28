@@ -196,7 +196,11 @@ def get_wifi_status():
         status_file = Path('/tmp/tipsy_wifi_status.json')
         if status_file.exists():
             with open(status_file, 'r') as f:
-                return json.load(f)
+                status = json.load(f)
+                # Stelle sicher, dass alle benötigten Felder vorhanden sind
+                if 'manual_hotspot_requested' not in status:
+                    status['manual_hotspot_requested'] = False
+                return status
     except Exception as e:
         logger.debug(f"Konnte WiFi-Status nicht laden: {e}")
     
@@ -208,7 +212,8 @@ def get_wifi_status():
             'status': 'connected',
             'ip': local_ip,
             'ssid': 'Unknown',
-            'hotspot_active': False
+            'hotspot_active': False,
+            'manual_hotspot_requested': False
         }
     else:
         return {
@@ -216,7 +221,8 @@ def get_wifi_status():
             'status': 'disconnected',
             'ip': '',
             'ssid': '',
-            'hotspot_active': False
+            'hotspot_active': False,
+            'manual_hotspot_requested': False
         }
 
 def create_qr_code_slide():
@@ -507,7 +513,7 @@ def show_pouring_and_loading(watcher):
 
 def create_settings_tray():
     """Create the settings tray UI elements"""
-    tray_height = int(screen_height * 0.4)  # Increased height for WiFi info
+    tray_height = int(screen_height * 0.5)  # Increased height for additional button
     tray_rect = pygame.Rect(0, screen_height - tray_height, screen_width, tray_height)
     
     # Create a semi-transparent background
@@ -525,7 +531,10 @@ def create_settings_tray():
     wifi_font = pygame.font.SysFont(None, 24)
     
     if wifi_status['hotspot_active']:
-        wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')}"
+        if wifi_status.get('manual_hotspot_requested', False):
+            wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')} (Manuell)"
+        else:
+            wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')} (Auto)"
         wifi_ip_text = f"🌐 Setup: {wifi_status.get('ip', '192.168.4.1')}"
         status_color = (255, 165, 0)  # Orange
     elif wifi_status['status'] == 'connected':
@@ -543,12 +552,26 @@ def create_settings_tray():
     wifi_ip_surface = wifi_font.render(wifi_ip_text, True, (200, 200, 200))
     wifi_ip_rect = wifi_ip_surface.get_rect(center=(screen_width // 2, screen_height - tray_height + 95))
     
-    # Prime pumps button (centered)
+    # Hotspot Toggle Button
     button_width = 200
-    button_height = 50
+    button_height = 45
+    hotspot_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
+                              screen_height - tray_height + 130, button_width, button_height)
+    hotspot_font = pygame.font.SysFont(None, 26)
+    
+    if wifi_status.get('manual_hotspot_requested', False):
+        hotspot_text = hotspot_font.render("Hotspot AUS", True, (255, 255, 255))
+        hotspot_color = (150, 50, 50)  # Red for "turn off"
+    else:
+        hotspot_text = hotspot_font.render("Hotspot AN", True, (255, 255, 255))
+        hotspot_color = (50, 150, 50)  # Green for "turn on"
+    
+    hotspot_text_rect = hotspot_text.get_rect(center=hotspot_rect.center)
+    
+    # Prime pumps button (below hotspot button)
     prime_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
-                           screen_height - tray_height + 130, button_width, button_height)
-    prime_font = pygame.font.SysFont(None, 28)
+                           screen_height - tray_height + 185, button_width, button_height)
+    prime_font = pygame.font.SysFont(None, 26)
     prime_text = prime_font.render("Prime Pumps", True, (255, 255, 255))
     prime_text_rect = prime_text.get_rect(center=prime_rect.center)
     
@@ -561,6 +584,10 @@ def create_settings_tray():
         'wifi_status_rect': wifi_status_rect,
         'wifi_ip_surface': wifi_ip_surface,
         'wifi_ip_rect': wifi_ip_rect,
+        'hotspot_rect': hotspot_rect,
+        'hotspot_text': hotspot_text,
+        'hotspot_text_rect': hotspot_text_rect,
+        'hotspot_color': hotspot_color,
         'prime_rect': prime_rect,
         'prime_text': prime_text,
         'prime_text_rect': prime_text_rect,
@@ -582,8 +609,12 @@ def draw_settings_tray(settings_ui, is_visible):
     add_layer(settings_ui['wifi_status_surface'], settings_ui['wifi_status_rect'], key='wifi_status')
     add_layer(settings_ui['wifi_ip_surface'], settings_ui['wifi_ip_rect'], key='wifi_ip')
     
-    # Create temporary surface for button
+    # Create temporary surface for buttons
     temp_surface = pygame.Surface(screen_size, pygame.SRCALPHA)
+    
+    # Draw hotspot toggle button
+    pygame.draw.rect(temp_surface, settings_ui['hotspot_color'], settings_ui['hotspot_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['hotspot_rect'], 2)
     
     # Draw prime pumps button
     pygame.draw.rect(temp_surface, (50, 150, 50), settings_ui['prime_rect'])
@@ -591,7 +622,8 @@ def draw_settings_tray(settings_ui, is_visible):
     
     add_layer(temp_surface, (0, 0), key='settings_controls')
     
-    # Draw button text
+    # Draw button texts
+    add_layer(settings_ui['hotspot_text'], settings_ui['hotspot_text_rect'], key='hotspot_text')
     add_layer(settings_ui['prime_text'], settings_ui['prime_text_rect'], key='prime_text')
 
 def create_settings_tab():
@@ -654,8 +686,49 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
             break
         clock.tick(60)
 
+def update_settings_tray_wifi_status(settings_ui):
+    """Aktualisiere WiFi-Status im Settings-Tray"""
+    wifi_status = get_wifi_status()
+    wifi_font = pygame.font.SysFont(None, 24)
+    
+    # Update WiFi status text
+    if wifi_status['hotspot_active']:
+        if wifi_status.get('manual_hotspot_requested', False):
+            wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')} (Manuell)"
+        else:
+            wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')} (Auto)"
+        wifi_ip_text = f"🌐 Setup: {wifi_status.get('ip', '192.168.4.1')}"
+        status_color = (255, 165, 0)  # Orange
+    elif wifi_status['status'] == 'connected':
+        wifi_status_text = f"📶 WLAN: {wifi_status.get('ssid', 'Unknown')}"
+        wifi_ip_text = f"🌐 IP: {wifi_status.get('ip', 'Unknown')}"
+        status_color = (0, 255, 0)  # Green
+    else:
+        wifi_status_text = "📶 WLAN: Nicht verbunden"
+        wifi_ip_text = "🌐 IP: Keine Verbindung"
+        status_color = (255, 0, 0)  # Red
+    
+    # Update surfaces
+    settings_ui['wifi_status_surface'] = wifi_font.render(wifi_status_text, True, status_color)
+    settings_ui['wifi_ip_surface'] = wifi_font.render(wifi_ip_text, True, (200, 200, 200))
+    
+    # Update hotspot button
+    hotspot_font = pygame.font.SysFont(None, 26)
+    if wifi_status.get('manual_hotspot_requested', False):
+        settings_ui['hotspot_text'] = hotspot_font.render("Hotspot AUS", True, (255, 255, 255))
+        settings_ui['hotspot_color'] = (150, 50, 50)  # Red for "turn off"
+    else:
+        settings_ui['hotspot_text'] = hotspot_font.render("Hotspot AN", True, (255, 255, 255))
+        settings_ui['hotspot_color'] = (50, 150, 50)  # Green for "turn on"
+    
+    settings_ui['wifi_status'] = wifi_status
+
 def handle_settings_interaction(settings_ui, event_pos):
     """Handle interactions with settings tray elements"""
+    # Check if hotspot toggle button is clicked
+    if settings_ui['hotspot_rect'].collidepoint(event_pos):
+        return 'toggle_hotspot'
+    
     # Check if prime button is clicked
     if settings_ui['prime_rect'].collidepoint(event_pos):
         return 'prime_pumps'
@@ -1056,7 +1129,9 @@ def run_interface():
 
     running = True
     last_refresh_check = pygame.time.get_ticks()
+    last_wifi_update = pygame.time.get_ticks()
     refresh_check_interval = 1000  # Check every 1 second
+    wifi_update_interval = 3000  # Update WiFi status every 3 seconds
     
     while running:
         # Check for refresh signals periodically
@@ -1067,6 +1142,12 @@ def run_interface():
                 cocktails = get_cocktails_with_qr()
                 current_cocktail, current_image, current_cocktail_name, previous_image, next_image = load_cocktail(current_index)
             last_refresh_check = current_time
+        
+        # Update WiFi status periodically if settings tray is visible
+        if current_time - last_wifi_update > wifi_update_interval:
+            if settings_visible:
+                update_settings_tray_wifi_status(settings_ui)
+            last_wifi_update = current_time
         
         events = pygame.event.get()
         for event in events:
@@ -1124,7 +1205,20 @@ def run_interface():
                 # Check if settings tray is clicked
                 if settings_visible and settings_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_settings_interaction(settings_ui, event.pos)
-                    if interaction == 'prime_pumps':
+                    if interaction == 'toggle_hotspot':
+                        # Toggle Hotspot
+                        try:
+                            from wifi_manager import toggle_hotspot
+                            success = toggle_hotspot()
+                            if success:
+                                logger.info("Hotspot-Toggle erfolgreich")
+                                # Update settings tray immediately
+                                update_settings_tray_wifi_status(settings_ui)
+                            else:
+                                logger.error("Hotspot-Toggle fehlgeschlagen")
+                        except Exception as e:
+                            logger.error(f"Fehler beim Hotspot-Toggle: {e}")
+                    elif interaction == 'prime_pumps':
                         # Import and call prime_pumps function
                         from controller import prime_pumps
                         prime_pumps(duration=2)
