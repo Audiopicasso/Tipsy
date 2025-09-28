@@ -513,7 +513,7 @@ def show_pouring_and_loading(watcher):
 
 def create_settings_tray():
     """Create the settings tray UI elements"""
-    tray_height = int(screen_height * 0.5)  # Increased height for additional button
+    tray_height = int(screen_height * 0.55)  # Increased height for additional buttons
     tray_rect = pygame.Rect(0, screen_height - tray_height, screen_width, tray_height)
     
     # Create a semi-transparent background
@@ -552,25 +552,25 @@ def create_settings_tray():
     wifi_ip_surface = wifi_font.render(wifi_ip_text, True, (200, 200, 200))
     wifi_ip_rect = wifi_ip_surface.get_rect(center=(screen_width // 2, screen_height - tray_height + 95))
     
-    # Hotspot Toggle Button
+    # UI Service Restart Button
     button_width = 200
     button_height = 45
-    hotspot_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
-                              screen_height - tray_height + 130, button_width, button_height)
-    hotspot_font = pygame.font.SysFont(None, 26)
+    ui_restart_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
+                                  screen_height - tray_height + 130, button_width, button_height)
+    ui_restart_font = pygame.font.SysFont(None, 24)
+    ui_restart_text = ui_restart_font.render("UI Neustart", True, (255, 255, 255))
+    ui_restart_text_rect = ui_restart_text.get_rect(center=ui_restart_rect.center)
     
-    if wifi_status.get('manual_hotspot_requested', False):
-        hotspot_text = hotspot_font.render("Hotspot AUS", True, (255, 255, 255))
-        hotspot_color = (150, 50, 50)  # Red for "turn off"
-    else:
-        hotspot_text = hotspot_font.render("Hotspot AN", True, (255, 255, 255))
-        hotspot_color = (50, 150, 50)  # Green for "turn on"
+    # Pi Reboot Button
+    pi_reboot_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
+                                screen_height - tray_height + 185, button_width, button_height)
+    pi_reboot_font = pygame.font.SysFont(None, 24)
+    pi_reboot_text = pi_reboot_font.render("Pi Neustart", True, (255, 255, 255))
+    pi_reboot_text_rect = pi_reboot_text.get_rect(center=pi_reboot_rect.center)
     
-    hotspot_text_rect = hotspot_text.get_rect(center=hotspot_rect.center)
-    
-    # Prime pumps button (below hotspot button)
+    # Prime pumps button (below reboot button)
     prime_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
-                           screen_height - tray_height + 185, button_width, button_height)
+                           screen_height - tray_height + 240, button_width, button_height)
     prime_font = pygame.font.SysFont(None, 26)
     prime_text = prime_font.render("Prime Pumps", True, (255, 255, 255))
     prime_text_rect = prime_text.get_rect(center=prime_rect.center)
@@ -584,10 +584,12 @@ def create_settings_tray():
         'wifi_status_rect': wifi_status_rect,
         'wifi_ip_surface': wifi_ip_surface,
         'wifi_ip_rect': wifi_ip_rect,
-        'hotspot_rect': hotspot_rect,
-        'hotspot_text': hotspot_text,
-        'hotspot_text_rect': hotspot_text_rect,
-        'hotspot_color': hotspot_color,
+        'ui_restart_rect': ui_restart_rect,
+        'ui_restart_text': ui_restart_text,
+        'ui_restart_text_rect': ui_restart_text_rect,
+        'pi_reboot_rect': pi_reboot_rect,
+        'pi_reboot_text': pi_reboot_text,
+        'pi_reboot_text_rect': pi_reboot_text_rect,
         'prime_rect': prime_rect,
         'prime_text': prime_text,
         'prime_text_rect': prime_text_rect,
@@ -612,9 +614,13 @@ def draw_settings_tray(settings_ui, is_visible):
     # Create temporary surface for buttons
     temp_surface = pygame.Surface(screen_size, pygame.SRCALPHA)
     
-    # Draw hotspot toggle button
-    pygame.draw.rect(temp_surface, settings_ui['hotspot_color'], settings_ui['hotspot_rect'])
-    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['hotspot_rect'], 2)
+    # Draw UI restart button
+    pygame.draw.rect(temp_surface, (50, 100, 150), settings_ui['ui_restart_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['ui_restart_rect'], 2)
+    
+    # Draw Pi reboot button
+    pygame.draw.rect(temp_surface, (150, 50, 50), settings_ui['pi_reboot_rect'])
+    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['pi_reboot_rect'], 2)
     
     # Draw prime pumps button
     pygame.draw.rect(temp_surface, (50, 150, 50), settings_ui['prime_rect'])
@@ -623,7 +629,8 @@ def draw_settings_tray(settings_ui, is_visible):
     add_layer(temp_surface, (0, 0), key='settings_controls')
     
     # Draw button texts
-    add_layer(settings_ui['hotspot_text'], settings_ui['hotspot_text_rect'], key='hotspot_text')
+    add_layer(settings_ui['ui_restart_text'], settings_ui['ui_restart_text_rect'], key='ui_restart_text')
+    add_layer(settings_ui['pi_reboot_text'], settings_ui['pi_reboot_text_rect'], key='pi_reboot_text')
     add_layer(settings_ui['prime_text'], settings_ui['prime_text_rect'], key='prime_text')
 
 def create_settings_tab():
@@ -676,9 +683,11 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         settings_ui['title_rect'].y = current_y + 30
         settings_ui['wifi_status_rect'].y = current_y + 70
         settings_ui['wifi_ip_rect'].y = current_y + 95
-        settings_ui['hotspot_rect'].y = current_y + 130
-        settings_ui['hotspot_text_rect'].center = settings_ui['hotspot_rect'].center
-        settings_ui['prime_rect'].y = current_y + 185
+        settings_ui['ui_restart_rect'].y = current_y + 130
+        settings_ui['ui_restart_text_rect'].center = settings_ui['ui_restart_rect'].center
+        settings_ui['pi_reboot_rect'].y = current_y + 185
+        settings_ui['pi_reboot_text_rect'].center = settings_ui['pi_reboot_rect'].center
+        settings_ui['prime_rect'].y = current_y + 240
         settings_ui['prime_text_rect'].center = settings_ui['prime_rect'].center
         
         draw_settings_tray(settings_ui, True)
@@ -714,22 +723,19 @@ def update_settings_tray_wifi_status(settings_ui):
     settings_ui['wifi_status_surface'] = wifi_font.render(wifi_status_text, True, status_color)
     settings_ui['wifi_ip_surface'] = wifi_font.render(wifi_ip_text, True, (200, 200, 200))
     
-    # Update hotspot button
-    hotspot_font = pygame.font.SysFont(None, 26)
-    if wifi_status.get('manual_hotspot_requested', False):
-        settings_ui['hotspot_text'] = hotspot_font.render("Hotspot AUS", True, (255, 255, 255))
-        settings_ui['hotspot_color'] = (150, 50, 50)  # Red for "turn off"
-    else:
-        settings_ui['hotspot_text'] = hotspot_font.render("Hotspot AN", True, (255, 255, 255))
-        settings_ui['hotspot_color'] = (50, 150, 50)  # Green for "turn on"
+    # No hotspot button updates needed anymore
     
     settings_ui['wifi_status'] = wifi_status
 
 def handle_settings_interaction(settings_ui, event_pos):
     """Handle interactions with settings tray elements"""
-    # Check if hotspot toggle button is clicked
-    if settings_ui['hotspot_rect'].collidepoint(event_pos):
-        return 'toggle_hotspot'
+    # Check if UI restart button is clicked
+    if settings_ui['ui_restart_rect'].collidepoint(event_pos):
+        return 'restart_ui_service'
+    
+    # Check if Pi reboot button is clicked
+    if settings_ui['pi_reboot_rect'].collidepoint(event_pos):
+        return 'reboot_pi'
     
     # Check if prime button is clicked
     if settings_ui['prime_rect'].collidepoint(event_pos):
@@ -1207,34 +1213,26 @@ def run_interface():
                 # Check if settings tray is clicked
                 if settings_visible and settings_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_settings_interaction(settings_ui, event.pos)
-                    if interaction == 'toggle_hotspot':
-                        # Toggle Hotspot über Befehlsdatei
+                    if interaction == 'restart_ui_service':
+                        # Restart UI service
                         try:
-                            import json
-                            from pathlib import Path
-                            
-                            command_file = Path('/tmp/tipsy_wifi_command.json')
-                            command = {'action': 'toggle_hotspot', 'timestamp': time.time()}
-                            
-                            with open(command_file, 'w') as f:
-                                json.dump(command, f)
-                            
-                            logger.info("Hotspot-Toggle Befehl gesendet")
-                            
-                            # Sofortiges visuelles Feedback und dann Status-Update
-                            import threading
-                            def delayed_update():
-                                # Mehrere Updates um sicherzustellen dass Änderung erkannt wird
-                                for i in range(3):
-                                    time.sleep(2)  # Warte 2 Sekunden zwischen Updates
-                                    update_settings_tray_wifi_status(settings_ui)
-                            
-                            # Sofortiges Update für visuelles Feedback
-                            update_settings_tray_wifi_status(settings_ui)
-                            threading.Thread(target=delayed_update, daemon=True).start()
-                            
+                            import subprocess
+                            result = subprocess.run(['sudo', 'systemctl', 'restart', 'tipsy-watchdog.service'], 
+                                                  capture_output=True, text=True, timeout=10)
+                            if result.returncode == 0:
+                                logger.info("UI Service erfolgreich neugestartet")
+                            else:
+                                logger.error(f"Fehler beim Neustarten des UI Services: {result.stderr}")
                         except Exception as e:
-                            logger.error(f"Fehler beim Senden des Hotspot-Toggle Befehls: {e}")
+                            logger.error(f"Fehler beim Neustarten des UI Services: {e}")
+                    elif interaction == 'reboot_pi':
+                        # Reboot Pi
+                        try:
+                            import subprocess
+                            logger.info("Starte Pi-Neustart...")
+                            subprocess.run(['sudo', 'reboot'], timeout=5)
+                        except Exception as e:
+                            logger.error(f"Fehler beim Neustarten des Pi: {e}")
                     elif interaction == 'prime_pumps':
                         # Import and call prime_pumps function
                         from controller import prime_pumps
