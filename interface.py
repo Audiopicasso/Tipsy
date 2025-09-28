@@ -187,12 +187,54 @@ def get_local_ip():
     except:
         return "localhost"
 
-def create_qr_code_slide():
-    """Create a QR code slide for the Streamlit app access"""
-    # Get local IP and port
+def get_wifi_status():
+    """Lade WiFi-Status vom WiFi Manager"""
+    try:
+        import json
+        from pathlib import Path
+        
+        status_file = Path('/tmp/tipsy_wifi_status.json')
+        if status_file.exists():
+            with open(status_file, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.debug(f"Konnte WiFi-Status nicht laden: {e}")
+    
+    # Fallback: Versuche lokale IP zu ermitteln
     local_ip = get_local_ip()
-    streamlit_port = 8501
-    url = f"http://{local_ip}:{streamlit_port}"
+    if local_ip and local_ip != "localhost":
+        return {
+            'mode': 'client',
+            'status': 'connected',
+            'ip': local_ip,
+            'ssid': 'Unknown',
+            'hotspot_active': False
+        }
+    else:
+        return {
+            'mode': 'unknown',
+            'status': 'disconnected',
+            'ip': '',
+            'ssid': '',
+            'hotspot_active': False
+        }
+
+def create_qr_code_slide():
+    """Create a QR code slide for the Streamlit app access or WiFi setup"""
+    wifi_status = get_wifi_status()
+    
+    if wifi_status['hotspot_active']:
+        # Hotspot ist aktiv - zeige Setup-URL
+        url = "http://192.168.4.1"
+        title = "WiFi Setup"
+        subtitle = f"Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')}"
+    else:
+        # Normale Verbindung - zeige Streamlit-URL
+        local_ip = wifi_status.get('ip', get_local_ip())
+        streamlit_port = 8501
+        url = f"http://{local_ip}:{streamlit_port}"
+        title = "Access App"
+        subtitle = f"Connected: {wifi_status.get('ssid', 'Unknown')}"
     
     # Create QR code
     qr = qrcode.QRCode(
@@ -221,11 +263,12 @@ def create_qr_code_slide():
     
     # Create a cocktail-like object for the QR code slide
     qr_cocktail = {
-        'normal_name': 'Access App',
-        'fun_name': 'Scan QR Code',
+        'normal_name': title,
+        'fun_name': subtitle,
         'qr_surface': qr_surface,
         'url': url,
-        'is_qr_slide': True
+        'is_qr_slide': True,
+        'wifi_status': wifi_status
     }
     
     return qr_cocktail
@@ -464,7 +507,7 @@ def show_pouring_and_loading(watcher):
 
 def create_settings_tray():
     """Create the settings tray UI elements"""
-    tray_height = int(screen_height * 0.4)  # 40% of screen height
+    tray_height = int(screen_height * 0.4)  # Increased height for WiFi info
     tray_rect = pygame.Rect(0, screen_height - tray_height, screen_width, tray_height)
     
     # Create a semi-transparent background
@@ -475,113 +518,53 @@ def create_settings_tray():
     # Settings title
     title_font = pygame.font.SysFont(None, 48)
     title_text = title_font.render("Settings", True, (255, 255, 255))
-    title_rect = title_text.get_rect(center=(screen_width // 2, screen_height - tray_height + 40))
+    title_rect = title_text.get_rect(center=(screen_width // 2, screen_height - tray_height + 30))
     
-    # Time per 50ml slider (easier to measure than 1ml)
-    slider_width = int(screen_width * 0.6)
-    slider_height = 20
-    slider_x = (screen_width - slider_width) // 2
-    slider_y = screen_height - tray_height + 100
+    # WiFi Status Info
+    wifi_status = get_wifi_status()
+    wifi_font = pygame.font.SysFont(None, 24)
     
-    # Slider background
-    slider_bg_rect = pygame.Rect(slider_x, slider_y, slider_width, slider_height)
+    if wifi_status['hotspot_active']:
+        wifi_status_text = f"📶 Hotspot: {wifi_status.get('hotspot_ssid', 'Tipsy-Setup')}"
+        wifi_ip_text = f"🌐 Setup: {wifi_status.get('ip', '192.168.4.1')}"
+        status_color = (255, 165, 0)  # Orange
+    elif wifi_status['status'] == 'connected':
+        wifi_status_text = f"📶 WLAN: {wifi_status.get('ssid', 'Unknown')}"
+        wifi_ip_text = f"🌐 IP: {wifi_status.get('ip', 'Unknown')}"
+        status_color = (0, 255, 0)  # Green
+    else:
+        wifi_status_text = "📶 WLAN: Nicht verbunden"
+        wifi_ip_text = "🌐 IP: Keine Verbindung"
+        status_color = (255, 0, 0)  # Red
     
-    # Convert ML_COEFFICIENT (time per 1ml) to time per 50ml for display
-    # ML_COEFFICIENT is seconds per 1ml, so time per 50ml = ML_COEFFICIENT * 50
-    time_per_50ml = ML_COEFFICIENT * 50
+    wifi_status_surface = wifi_font.render(wifi_status_text, True, status_color)
+    wifi_status_rect = wifi_status_surface.get_rect(center=(screen_width // 2, screen_height - tray_height + 70))
     
-    # Slider range: 5-50 seconds for 50ml (equivalent to 0.1-1.0 seconds per 1ml)
-    min_val_50ml, max_val_50ml = 5.0, 50.0
-    slider_handle_x = slider_x + (time_per_50ml - min_val_50ml) / (max_val_50ml - min_val_50ml) * slider_width
-    slider_handle_rect = pygame.Rect(slider_handle_x - 10, slider_y - 5, 20, 30)
+    wifi_ip_surface = wifi_font.render(wifi_ip_text, True, (200, 200, 200))
+    wifi_ip_rect = wifi_ip_surface.get_rect(center=(screen_width // 2, screen_height - tray_height + 95))
     
-    # Slider label
-    slider_font = pygame.font.SysFont(None, 32)
-    slider_label = slider_font.render(f"Time per 50ml: {time_per_50ml:.1f}s", True, (255, 255, 255))
-    slider_label_rect = slider_label.get_rect(center=(screen_width // 2, slider_y - 30))
-    
-    # Buttons
-    button_width = 150
+    # Prime pumps button (centered)
+    button_width = 200
     button_height = 50
-    button_spacing = 20
-    
-    # Prime pumps button
-    prime_rect = pygame.Rect(screen_width // 2 - button_width - button_spacing // 2, 
-                           screen_height - tray_height + 180, button_width, button_height)
+    prime_rect = pygame.Rect(screen_width // 2 - button_width // 2, 
+                           screen_height - tray_height + 130, button_width, button_height)
     prime_font = pygame.font.SysFont(None, 28)
     prime_text = prime_font.render("Prime Pumps", True, (255, 255, 255))
     prime_text_rect = prime_text.get_rect(center=prime_rect.center)
-    
-    # Clean pumps button
-    clean_rect = pygame.Rect(screen_width // 2 + button_spacing // 2, 
-                           screen_height - tray_height + 180, button_width, button_height)
-    clean_font = pygame.font.SysFont(None, 28)
-    clean_text = clean_font.render("Clean Pumps", True, (255, 255, 255))
-    clean_text_rect = clean_text.get_rect(center=clean_rect.center)
-    
-    # Reverse pump direction toggle switch
-    switch_width = 60
-    switch_height = 30
-    switch_x = screen_width // 2 - switch_width // 2
-    switch_y = screen_height - tray_height + 250
-    
-    switch_rect = pygame.Rect(switch_x, switch_y, switch_width, switch_height)
-    
-    # Switch label
-    switch_font = pygame.font.SysFont(None, 24)
-    switch_label = switch_font.render("Invert Pump Pins", True, (255, 255, 255))
-    switch_label_rect = switch_label.get_rect(center=(screen_width // 2, switch_y - 20))
-    
-    # Streamlit app access info
-    import socket
-    try:
-        # Get local IP address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        local_ip = "localhost"
-    
-    streamlit_port = 8501  # Default Streamlit port
-    
-    # Access info label
-    access_font = pygame.font.SysFont(None, 20)
-    access_label = access_font.render("Access your app at:", True, (200, 200, 200))
-    access_label_rect = access_label.get_rect(center=(screen_width // 2, switch_y + 50))
-    
-    # IP and port info
-    ip_font = pygame.font.SysFont(None, 24)
-    ip_text = f"http://{local_ip}:{streamlit_port}"
-    ip_label = ip_font.render(ip_text, True, (0, 255, 255))  # Cyan color for URL
-    ip_label_rect = ip_label.get_rect(center=(screen_width // 2, switch_y + 75))
     
     return {
         'tray_rect': tray_rect,
         'overlay': overlay,
         'title_text': title_text,
         'title_rect': title_rect,
-        'slider_bg_rect': slider_bg_rect,
-        'slider_handle_rect': slider_handle_rect,
-        'slider_label': slider_label,
-        'slider_label_rect': slider_label_rect,
+        'wifi_status_surface': wifi_status_surface,
+        'wifi_status_rect': wifi_status_rect,
+        'wifi_ip_surface': wifi_ip_surface,
+        'wifi_ip_rect': wifi_ip_rect,
         'prime_rect': prime_rect,
         'prime_text': prime_text,
         'prime_text_rect': prime_text_rect,
-        'clean_rect': clean_rect,
-        'clean_text': clean_text,
-        'clean_text_rect': clean_text_rect,
-        'switch_rect': switch_rect,
-        'switch_label': switch_label,
-        'switch_label_rect': switch_label_rect,
-        'access_label': access_label,
-        'access_label_rect': access_label_rect,
-        'ip_label': ip_label,
-        'ip_label_rect': ip_label_rect,
-        'slider_x': slider_x,
-        'slider_width': slider_width,
-        'min_val': min_val_50ml,
-        'max_val': max_val_50ml
+        'wifi_status': wifi_status
     }
 
 def draw_settings_tray(settings_ui, is_visible):
@@ -595,50 +578,21 @@ def draw_settings_tray(settings_ui, is_visible):
     # Draw title
     add_layer(settings_ui['title_text'], settings_ui['title_rect'], key='settings_title')
     
-    # Create temporary surfaces for slider and buttons
+    # Draw WiFi status
+    add_layer(settings_ui['wifi_status_surface'], settings_ui['wifi_status_rect'], key='wifi_status')
+    add_layer(settings_ui['wifi_ip_surface'], settings_ui['wifi_ip_rect'], key='wifi_ip')
+    
+    # Create temporary surface for button
     temp_surface = pygame.Surface(screen_size, pygame.SRCALPHA)
     
-    # Draw slider background
-    pygame.draw.rect(temp_surface, (100, 100, 100), settings_ui['slider_bg_rect'])
-    
-    # Draw slider handle
-    pygame.draw.rect(temp_surface, (255, 255, 255), settings_ui['slider_handle_rect'])
-    
-    # Draw buttons
+    # Draw prime pumps button
     pygame.draw.rect(temp_surface, (50, 150, 50), settings_ui['prime_rect'])
-    pygame.draw.rect(temp_surface, (150, 50, 50), settings_ui['clean_rect'])
-    
-    # Draw switch background
-    switch_color = (0, 200, 0) if INVERT_PUMP_PINS else (100, 100, 100)
-    pygame.draw.rect(temp_surface, switch_color, settings_ui['switch_rect'])
-    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['switch_rect'], 2)
-    
-    # Draw switch indicator (circle)
-    indicator_radius = 12
-    if INVERT_PUMP_PINS:
-        # ON position - indicator on the right
-        indicator_x = settings_ui['switch_rect'].x + settings_ui['switch_rect'].width - indicator_radius - 3
-    else:
-        # OFF position - indicator on the left
-        indicator_x = settings_ui['switch_rect'].x + indicator_radius + 3
-    indicator_y = settings_ui['switch_rect'].y + settings_ui['switch_rect'].height // 2
-    pygame.draw.circle(temp_surface, (255, 255, 255), (indicator_x, indicator_y), indicator_radius)
+    pygame.draw.rect(temp_surface, (200, 200, 200), settings_ui['prime_rect'], 2)
     
     add_layer(temp_surface, (0, 0), key='settings_controls')
     
-    # Draw slider label
-    add_layer(settings_ui['slider_label'], settings_ui['slider_label_rect'], key='slider_label')
-    
     # Draw button text
     add_layer(settings_ui['prime_text'], settings_ui['prime_text_rect'], key='prime_text')
-    add_layer(settings_ui['clean_text'], settings_ui['clean_text_rect'], key='clean_text')
-    
-    # Draw switch label
-    add_layer(settings_ui['switch_label'], settings_ui['switch_label_rect'], key='switch_label')
-    
-    # Draw access info
-    add_layer(settings_ui['access_label'], settings_ui['access_label_rect'], key='access_label')
-    add_layer(settings_ui['ip_label'], settings_ui['ip_label_rect'], key='ip_label')
 
 def create_settings_tab():
     """Create the small tab at the bottom for accessing settings"""
@@ -686,24 +640,12 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         current_y = start_y + (end_y - start_y) * progress
         settings_ui['tray_rect'].y = current_y
         
-        # No tab to update anymore
-        
-        # Update all related positions
-        settings_ui['title_rect'].y = current_y + 40
-        settings_ui['slider_bg_rect'].y = current_y + 100
-        settings_ui['slider_handle_rect'].y = current_y + 95
-        settings_ui['slider_label_rect'].y = current_y + 70
-        settings_ui['prime_rect'].y = current_y + 180
-        settings_ui['clean_rect'].y = current_y + 180
+        # Update positions
+        settings_ui['title_rect'].y = current_y + 30
+        settings_ui['wifi_status_rect'].y = current_y + 70
+        settings_ui['wifi_ip_rect'].y = current_y + 95
+        settings_ui['prime_rect'].y = current_y + 130
         settings_ui['prime_text_rect'].center = settings_ui['prime_rect'].center
-        settings_ui['clean_text_rect'].center = settings_ui['clean_rect'].center
-        settings_ui['switch_rect'].y = current_y + 250
-        settings_ui['switch_label_rect'].y = current_y + 230
-        settings_ui['access_label_rect'].y = current_y + 300
-        settings_ui['ip_label_rect'].y = current_y + 325
-        
-        # Update tab layer
-        # No tab layer to update anymore
         
         draw_settings_tray(settings_ui, True)
         draw_frame()
@@ -714,47 +656,12 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
 
 def handle_settings_interaction(settings_ui, event_pos):
     """Handle interactions with settings tray elements"""
-    # Check if slider is being dragged
-    if settings_ui['slider_handle_rect'].collidepoint(event_pos):
-        return 'slider_drag'
-    
     # Check if prime button is clicked
     if settings_ui['prime_rect'].collidepoint(event_pos):
         return 'prime_pumps'
     
-    # Check if clean button is clicked
-    if settings_ui['clean_rect'].collidepoint(event_pos):
-        return 'clean_pumps'
-    
-    # Check if switch is clicked
-    if settings_ui['switch_rect'].collidepoint(event_pos):
-        return 'toggle_switch'
-    
     return None
 
-def update_ml_coefficient(settings_ui, new_value):
-    """Update the ML_COEFFICIENT setting and slider position"""
-    global ML_COEFFICIENT
-    
-    # Convert from time per 50ml back to time per 1ml
-    # new_value is seconds per 50ml, so ML_COEFFICIENT = new_value / 50
-    ML_COEFFICIENT = max(0.1, min(1.0, new_value / 50))
-    
-    # Update slider handle position (convert back to 50ml for display)
-    time_per_50ml = ML_COEFFICIENT * 50
-    min_val_50ml, max_val_50ml = 5.0, 50.0
-    slider_handle_x = settings_ui['slider_x'] + (time_per_50ml - min_val_50ml) / (max_val_50ml - min_val_50ml) * settings_ui['slider_width']
-    settings_ui['slider_handle_rect'].x = slider_handle_x - 10
-    
-    # Update slider label
-    slider_font = pygame.font.SysFont(None, 32)
-    settings_ui['slider_label'] = slider_font.render(f"Time per 50ml: {time_per_50ml:.1f}s", True, (255, 255, 255))
-
-def toggle_pump_direction():
-    """Toggle the INVERT_PUMP_PINS setting"""
-    global INVERT_PUMP_PINS
-    INVERT_PUMP_PINS = not INVERT_PUMP_PINS
-    logger.info(f'Pump direction inverted: {INVERT_PUMP_PINS}')
 
 def create_drink_management_tray():
     """Create the drink management tray UI elements (Pumpen-Test)."""
@@ -1132,7 +1039,6 @@ def run_interface():
     # Initialize settings tray (no tab needed)
     settings_ui = create_settings_tray()
     settings_visible = False
-    slider_dragging = False
     
     # Initialize drink management tray (no tab needed)
     drink_ui = create_drink_management_tray()
@@ -1218,19 +1124,10 @@ def run_interface():
                 # Check if settings tray is clicked
                 if settings_visible and settings_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_settings_interaction(settings_ui, event.pos)
-                    if interaction == 'slider_drag':
-                        slider_dragging = True
-                    elif interaction == 'prime_pumps':
+                    if interaction == 'prime_pumps':
                         # Import and call prime_pumps function
                         from controller import prime_pumps
                         prime_pumps(duration=2)
-                    elif interaction == 'clean_pumps':
-                        # Import and call clean_pumps function
-                        from controller import clean_pumps
-                        clean_pumps(duration=10)
-                    elif interaction == 'toggle_switch':
-                        # Toggle pump direction
-                        toggle_pump_direction()
                     continue
                 
                 # If drink management is visible and clicked outside, close it
@@ -1249,18 +1146,7 @@ def run_interface():
                 drag_start_x = event.pos[0]
             if event.type == pygame.MOUSEMOTION:
                 # Tab dragging no longer needed - using swipe gestures instead
-                if slider_dragging:
-                    # Update slider based on mouse position
-                    mouse_x = event.pos[0]
-                    slider_x = settings_ui['slider_x']
-                    slider_width = settings_ui['slider_width']
-                    
-                    # Calculate new value (time per 50ml)
-                    relative_x = max(0, min(slider_width, mouse_x - slider_x))
-                    min_val_50ml, max_val_50ml = 5.0, 50.0
-                    new_value = min_val_50ml + (relative_x / slider_width) * (max_val_50ml - min_val_50ml)
-                    update_ml_coefficient(settings_ui, new_value)
-                elif dragging:
+                if dragging:
                     current_x = event.pos[0]
                     drag_offset = current_x - drag_start_x
             if event.type == pygame.MOUSEBUTTONUP:
@@ -1338,10 +1224,7 @@ def run_interface():
                             dragging = True
                             drag_start_x = swipe_start_pos[0]
                 
-                if slider_dragging:
-                    slider_dragging = False
-                    continue
-                elif dragging:
+                if dragging:
                     # If it's a click (minimal drag), check extra logos.
                     if abs(drag_offset) < 10:
                         pos = event.pos

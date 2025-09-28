@@ -1,0 +1,20 @@
+[Unit]
+Description=Tipsy WiFi Manager
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy
+ExecStart=/usr/bin/python3 /home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy/wifi_manager.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Umgebungsvariablen
+Environment=PYTHONPATH=/home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy
+
+[Install]
+WantedBy=multi-user.target
