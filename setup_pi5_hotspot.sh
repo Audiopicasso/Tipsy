@@ -2,7 +2,7 @@
 # Setup-Script für Raspberry Pi 5 Hotspot-Funktionalität
 # Behebt bekannte Probleme mit Bookworm OS und Pi 5
 
-echo "🍹 Tipsy Pi 5 Hotspot Setup"
+echo "🍻 Prost Pi 5 Hotspot Setup"
 echo "=========================="
 
 # Prüfe ob auf Pi 5 mit Bookworm
@@ -61,7 +61,7 @@ sudo tee /etc/hostapd/hostapd.conf > /dev/null << 'EOF'
 # Raspberry Pi 5 optimierte hostapd-Konfiguration
 interface=wlan0
 driver=nl80211
-ssid=Tipsy-Setup
+ssid=Prost-Setup
 hw_mode=g
 channel=7
 wmm_enabled=0
@@ -69,7 +69,7 @@ macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
 wpa=2
-wpa_passphrase=tipsy123
+wpa_passphrase=prost123
 wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP CCMP
 rsn_pairwise=CCMP
@@ -82,7 +82,7 @@ EOF
 echo "⚙️  Konfiguriere dnsmasq..."
 sudo cp /etc/dnsmasq.conf /etc/dnsmasq.conf.backup
 sudo tee /etc/dnsmasq.conf > /dev/null << 'EOF'
-# Tipsy dnsmasq-Konfiguration für Pi 5
+# Prost dnsmasq-Konfiguration für Pi 5
 interface=wlan0
 bind-interfaces
 server=8.8.8.8
@@ -98,7 +98,7 @@ log-dhcp
 log-facility=/var/log/dnsmasq.log
 EOF
 
-# Erstelle systemd-Service für Tipsy WiFi Manager
+# Erstelle systemd-Service für Tipsy WiFi Manager (Backend bleibt tipsy)
 echo "⚙️  Konfiguriere Tipsy WiFi Service..."
 sudo tee /etc/systemd/system/tipsy-wifi.service > /dev/null << 'EOF'
 [Unit]
@@ -110,15 +110,15 @@ Requires=NetworkManager.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy
-ExecStart=/usr/bin/python3 /home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy/wifi_manager.py
+WorkingDirectory=/home/pi/Tipsy
+ExecStart=/usr/bin/python3 /home/pi/Tipsy/wifi_manager.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
 # Umgebungsvariablen
-Environment=PYTHONPATH=/home/pi/Documents/3D Drucker/Tipsy Cocktail Mixer/Software/Tipsy/Tipsy
+Environment=PYTHONPATH=/home/pi/Tipsy
 
 [Install]
 WantedBy=multi-user.target
@@ -280,8 +280,8 @@ echo "4. Teste Web-Server: python3 /home/pi/test_webserver.py"
 echo "5. Prüfe Logs: sudo journalctl -u tipsy-wifi -f"
 echo ""
 echo "🔧 Hotspot-Informationen:"
-echo "   SSID: Tipsy-Setup"
-echo "   Passwort: tipsy123"
+echo "   SSID: Prost-Setup"
+echo "   Passwort: prost123"
 echo "   IP: 192.168.4.1"
 echo ""
 echo "🚨 Bei Problemen:"

@@ -65,7 +65,7 @@ def test_http_request(port=80):
                 print(f"   Content-Type: {response.headers.get('content-type', 'unknown')}")
                 print(f"   Content-Length: {len(response.text)} Zeichen")
                 
-                if 'Tipsy WLAN Setup' in response.text:
+                 if 'Prost WLAN Setup' in response.text:
                     print("✅ Setup-Seite enthält erwarteten Inhalt")
                 else:
                     print("⚠️  Setup-Seite enthält nicht den erwarteten Inhalt")
@@ -130,7 +130,7 @@ def check_network_interface():
         print(f"❌ Fehler beim Prüfen des Netzwerk-Interface: {e}")
 
 def main():
-    print("🧪 Tipsy Web-Server Test")
+    print("🧪 Prost Web-Server Test")
     print("=" * 40)
     
     # 1. Prüfe WiFi-Manager Status

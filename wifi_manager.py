@@ -42,8 +42,8 @@ class WiFiManager:
         self.manual_hotspot_requested = False  # Flag für manuell angeforderten Hotspot
         
         # Hotspot Konfiguration
-        self.hotspot_ssid = "Tipsy-Setup"
-        self.hotspot_password = "tipsy123"  # Einfaches Passwort für Stabilität
+        self.hotspot_ssid = "Prost-Setup"
+        self.hotspot_password = "prost123"  # Einfaches Passwort für Stabilität
         self.hotspot_ip = "192.168.4.1"
         self.web_server_running = False  # Flag um mehrfache Web-Server zu vermeiden
         
@@ -164,10 +164,60 @@ class WiFiManager:
             logger.error(f"Fehler beim WLAN-Scan: {e}")
             return []
     
-    def connect_to_network(self, ssid, password=None):
-        """Verbinde mit einem WLAN-Netzwerk"""
+    def connect_to_network_networkmanager(self, ssid, password=None):
+        """Verbinde mit WLAN über NetworkManager (moderne Methode für Pi 5)"""
         try:
-            logger.info(f"Versuche Verbindung zu {ssid}...")
+            logger.info(f"Versuche NetworkManager-Verbindung zu {ssid}...")
+            
+            # Lösche existierende Verbindung mit gleichem Namen
+            subprocess.run(['sudo', 'nmcli', 'connection', 'delete', ssid], 
+                         capture_output=True)
+            
+            # Erstelle neue Verbindung
+            if password:
+                # Verschlüsseltes Netzwerk
+                cmd = [
+                    'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid,
+                    'password', password
+                ]
+            else:
+                # Offenes Netzwerk
+                cmd = [
+                    'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid
+                ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                logger.info(f"NetworkManager-Verbindung zu {ssid} erfolgreich")
+                
+                # Warte kurz und prüfe Verbindung
+                time.sleep(5)
+                if self.check_internet_connection():
+                    # Speichere Netzwerk als bekannt
+                    self.known_networks[ssid] = password
+                    self.save_known_networks()
+                    return True
+                else:
+                    logger.warning(f"Verbindung hergestellt, aber kein Internet über {ssid}")
+                    return False
+            else:
+                logger.error(f"NetworkManager-Verbindung zu {ssid} fehlgeschlagen: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Fehler bei NetworkManager-Verbindung zu {ssid}: {e}")
+            return False
+    
+    def connect_to_network_legacy(self, ssid, password=None):
+        """Verbinde mit WLAN über wpa_supplicant (Legacy-Methode)"""
+        try:
+            logger.info(f"Versuche Legacy-Verbindung zu {ssid}...")
+            
+            # Stoppe NetworkManager für wlan0
+            subprocess.run(['sudo', 'nmcli', 'device', 'set', 'wlan0', 'managed', 'no'], 
+                         capture_output=True)
+            time.sleep(2)
             
             # Erstelle wpa_supplicant Konfiguration
             if password:
@@ -206,7 +256,7 @@ network={{
             
             # Prüfe Verbindung
             if self.check_internet_connection():
-                logger.info(f"Erfolgreich mit {ssid} verbunden")
+                logger.info(f"Legacy-Verbindung zu {ssid} erfolgreich")
                 
                 # Speichere Netzwerk als bekannt
                 self.known_networks[ssid] = password
@@ -218,11 +268,31 @@ network={{
                 
                 return True
             else:
-                logger.warning(f"Verbindung zu {ssid} fehlgeschlagen")
+                logger.warning(f"Legacy-Verbindung zu {ssid} fehlgeschlagen")
                 return False
                 
         except Exception as e:
-            logger.error(f"Fehler bei Verbindung zu {ssid}: {e}")
+            logger.error(f"Fehler bei Legacy-Verbindung zu {ssid}: {e}")
+            return False
+    
+    def connect_to_network(self, ssid, password=None):
+        """Verbinde mit WLAN-Netzwerk mit automatischer Methodenerkennung"""
+        try:
+            # Prüfe ob NetworkManager verfügbar ist
+            result = subprocess.run(['which', 'nmcli'], capture_output=True)
+            if result.returncode == 0:
+                logger.info("Verwende NetworkManager für WLAN-Verbindung")
+                if self.connect_to_network_networkmanager(ssid, password):
+                    return True
+                else:
+                    logger.warning("NetworkManager-Verbindung fehlgeschlagen, versuche Legacy-Methode")
+            
+            # Fallback zu Legacy-Methode
+            logger.info("Verwende Legacy wpa_supplicant für WLAN-Verbindung")
+            return self.connect_to_network_legacy(ssid, password)
+            
+        except Exception as e:
+            logger.error(f"Fehler bei WLAN-Verbindung zu {ssid}: {e}")
             return False
     
     def check_internet_connection(self):
@@ -284,7 +354,7 @@ network={{
             logger.info("Starte Hotspot mit NetworkManager...")
             
             # Lösche existierende Hotspot-Verbindung
-            subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Tipsy-Hotspot'], 
+            subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Prost-Hotspot'], 
                          capture_output=True)
             
             # Erstelle neue Hotspot-Verbindung
@@ -292,7 +362,7 @@ network={{
                 'sudo', 'nmcli', 'connection', 'add',
                 'type', 'wifi',
                 'ifname', 'wlan0',
-                'con-name', 'Tipsy-Hotspot',
+                'con-name', 'Prost-Hotspot',
                 'autoconnect', 'no',
                 'ssid', self.hotspot_ssid
             ]
@@ -304,19 +374,19 @@ network={{
             
             # Konfiguriere Hotspot-Einstellungen
             config_commands = [
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'wifi.mode', 'ap'],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'wifi.band', 'bg'],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'wifi.channel', '7'],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'wifi-sec.key-mgmt', 'wpa-psk'],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'wifi-sec.psk', self.hotspot_password],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'ipv4.method', 'shared'],
-                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                ['sudo', 'nmcli', 'connection', 'modify', 'Prost-Hotspot', 
                  'ipv4.addresses', f'{self.hotspot_ip}/24']
             ]
             
@@ -327,7 +397,7 @@ network={{
                     return False
             
             # Aktiviere Hotspot
-            result = subprocess.run(['sudo', 'nmcli', 'connection', 'up', 'Tipsy-Hotspot'], 
+            result = subprocess.run(['sudo', 'nmcli', 'connection', 'up', 'Prost-Hotspot'], 
                                   capture_output=True, text=True)
             if result.returncode != 0:
                 logger.error(f"Fehler beim Aktivieren des Hotspots: {result.stderr}")
@@ -473,12 +543,12 @@ log-dhcp
             logger.info("Stoppe WLAN-Hotspot...")
             
             # Versuche NetworkManager-Hotspot zu stoppen
-            result = subprocess.run(['sudo', 'nmcli', 'connection', 'down', 'Tipsy-Hotspot'], 
+            result = subprocess.run(['sudo', 'nmcli', 'connection', 'down', 'Prost-Hotspot'], 
                                   capture_output=True)
             if result.returncode == 0:
                 logger.info("NetworkManager Hotspot gestoppt")
                 # Lösche Hotspot-Verbindung
-                subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Tipsy-Hotspot'], 
+                subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Prost-Hotspot'], 
                              capture_output=True)
             
             # Stoppe Legacy-Services (falls aktiv)
@@ -581,7 +651,7 @@ log-dhcp
                             html = """
                             <html><head><meta charset="utf-8"><title>Verbindung...</title></head><body>
                             <div style="text-align: center; font-family: Arial; margin-top: 50px;">
-                            <h2>🍹 Verbindung wird hergestellt...</h2>
+                            <h2>🍻 Verbindung wird hergestellt...</h2>
                             <p>Bitte warten Sie einen Moment. Das Gerät versucht sich zu verbinden.</p>
                             <p>Bei erfolgreicher Verbindung wird der Hotspot automatisch deaktiviert.</p>
                             <div style="margin-top: 30px;">
@@ -659,7 +729,7 @@ log-dhcp
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Tipsy WLAN Setup</title>
+                    <title>Prost WLAN Setup</title>
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <style>
@@ -682,10 +752,10 @@ log-dhcp
                 </head>
                 <body>
                     <div class="container">
-                        <h1>🍹 Tipsy WLAN Setup</h1>
+                        <h1>🍻 Prost WLAN Setup</h1>
                         
                         <div class="info">
-                            <strong>🍹 Willkommen beim Tipsy WLAN-Setup!</strong><br>
+                            <strong>🍻 Willkommen beim Prost WLAN-Setup!</strong><br>
                             Sie sind mit dem Hotspot <strong>{self.server.wifi_manager.hotspot_ssid}</strong> verbunden.<br>
                             Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie das Passwort ein.
                         </div>

@@ -1,4 +1,4 @@
-# 🍹 Tipsy Hotspot Verbindung (Raspberry Pi 5 Optimiert)
+# 🍻 Prost Hotspot Verbindung (Raspberry Pi 5 Optimiert)
 
 ## ⚠️ Wichtiger Hinweis für Raspberry Pi 5
 
@@ -6,16 +6,16 @@ Der Raspberry Pi 5 mit Bookworm OS hat bekannte Probleme mit traditionellen Hots
 
 ## Hotspot-Informationen
 
-**SSID:** `Tipsy-Setup`  
-**Passwort:** `tipsy123`  
+**SSID:** `Prost-Setup`  
+**Passwort:** `prost123`  
 **IP-Adresse:** `192.168.4.1`  
 **Verschlüsselung:** WPA2-PSK
 
 ## Verbindung herstellen
 
 1. **WLAN-Netzwerke suchen** auf deinem Gerät (Handy, Laptop, etc.)
-2. **"Tipsy-Setup"** auswählen
-3. **Passwort eingeben:** `tipsy123`
+2. **"Prost-Setup"** auswählen
+3. **Passwort eingeben:** `prost123`
 4. **Warten** bis Verbindung hergestellt ist
 5. **Browser öffnen** und zu `http://192.168.4.1` navigieren
 
@@ -50,12 +50,12 @@ Sobald du verbunden bist, öffnet sich automatisch die Setup-Seite oder du gehst
 - Näher zum Raspberry Pi gehen
 
 ### Verbindung schlägt fehl
-- Passwort korrekt eingeben: `tipsy123`
+- Passwort korrekt eingeben: `prost123`
 - WLAN-Cache auf deinem Gerät löschen
 - Anderen Kanal probieren (automatisch nach Neustart)
 
 ### Setup-Seite lädt nicht
-- Sicherstellen dass du mit "Tipsy-Setup" verbunden bist
+- Sicherstellen dass du mit "Prost-Setup" verbunden bist
 - Browser-Cache leeren
 - Direkt zu `192.168.4.1` navigieren
 - Anderen Browser probieren
