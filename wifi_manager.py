@@ -135,14 +135,18 @@ class WiFiManager:
             logger.info(f"Versuche Verbindung zu {ssid}...")
             
             # Erstelle wpa_supplicant Konfiguration
-            wpa_config = f"""
-country=DE
+            if password:
+                auth_config = f'psk="{password}"'
+            else:
+                auth_config = "key_mgmt=NONE"
+            
+            wpa_config = f"""country=DE
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 
 network={{
     ssid="{ssid}"
-    {"psk=\"" + password + "\"" if password else "key_mgmt=NONE"}
+    {auth_config}
 }}
 """
             
