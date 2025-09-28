@@ -676,7 +676,9 @@ def animate_settings_tray(settings_ui, settings_tab, show_tray, duration=300):
         settings_ui['title_rect'].y = current_y + 30
         settings_ui['wifi_status_rect'].y = current_y + 70
         settings_ui['wifi_ip_rect'].y = current_y + 95
-        settings_ui['prime_rect'].y = current_y + 130
+        settings_ui['hotspot_rect'].y = current_y + 130
+        settings_ui['hotspot_text_rect'].center = settings_ui['hotspot_rect'].center
+        settings_ui['prime_rect'].y = current_y + 185
         settings_ui['prime_text_rect'].center = settings_ui['prime_rect'].center
         
         draw_settings_tray(settings_ui, True)
@@ -1206,18 +1208,29 @@ def run_interface():
                 if settings_visible and settings_ui['tray_rect'].collidepoint(event.pos):
                     interaction = handle_settings_interaction(settings_ui, event.pos)
                     if interaction == 'toggle_hotspot':
-                        # Toggle Hotspot
+                        # Toggle Hotspot über Befehlsdatei
                         try:
-                            from wifi_manager import toggle_hotspot
-                            success = toggle_hotspot()
-                            if success:
-                                logger.info("Hotspot-Toggle erfolgreich")
-                                # Update settings tray immediately
+                            import json
+                            from pathlib import Path
+                            
+                            command_file = Path('/tmp/tipsy_wifi_command.json')
+                            command = {'action': 'toggle_hotspot', 'timestamp': time.time()}
+                            
+                            with open(command_file, 'w') as f:
+                                json.dump(command, f)
+                            
+                            logger.info("Hotspot-Toggle Befehl gesendet")
+                            
+                            # Warte kurz und aktualisiere dann den Status
+                            import threading
+                            def delayed_update():
+                                time.sleep(1)  # Kurz warten bis Befehl verarbeitet wurde
                                 update_settings_tray_wifi_status(settings_ui)
-                            else:
-                                logger.error("Hotspot-Toggle fehlgeschlagen")
+                            
+                            threading.Thread(target=delayed_update, daemon=True).start()
+                            
                         except Exception as e:
-                            logger.error(f"Fehler beim Hotspot-Toggle: {e}")
+                            logger.error(f"Fehler beim Senden des Hotspot-Toggle Befehls: {e}")
                     elif interaction == 'prime_pumps':
                         # Import and call prime_pumps function
                         from controller import prime_pumps

@@ -227,22 +227,39 @@ network={{
     def check_internet_connection(self):
         """Prüfe Internetverbindung"""
         try:
-            # Versuche DNS-Auflösung
-            socket.gethostbyname('google.com')
-            
-            # Hole aktuelle IP-Adresse
+            # Hole aktuelle IP-Adresse zuerst
             result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
             if result.returncode == 0:
-                ip = result.stdout.strip().split()[0]
+                ip = result.stdout.strip().split()[0] if result.stdout.strip() else ""
                 if ip and not ip.startswith('192.168.4.'):  # Nicht Hotspot-IP
-                    logger.info(f"Internetverbindung aktiv, IP: {ip}")
-                    return True
-            return False
-        except Exception:
+                    # Versuche DNS-Auflösung mit Timeout
+                    try:
+                        socket.setdefaulttimeout(5)  # 5 Sekunden Timeout
+                        socket.gethostbyname('8.8.8.8')  # Google DNS
+                        logger.debug(f"Internetverbindung aktiv, IP: {ip}")
+                        return True
+                    except socket.timeout:
+                        logger.debug("DNS-Timeout - keine Internetverbindung")
+                        return False
+                    except Exception as e:
+                        logger.debug(f"DNS-Fehler: {e}")
+                        return False
+                else:
+                    logger.debug(f"Keine gültige Client-IP gefunden: {ip}")
+                    return False
+            else:
+                logger.debug("Keine IP-Adresse gefunden")
+                return False
+        except Exception as e:
+            logger.debug(f"Fehler bei Internetverbindungsprüfung: {e}")
             return False
     
     def try_known_networks(self):
         """Versuche Verbindung zu bekannten Netzwerken"""
+        if not self.known_networks:
+            logger.info("Keine bekannten Netzwerke gespeichert")
+            return False
+            
         available_networks = self.scan_networks()
         available_ssids = [net['ssid'] for net in available_networks]
         
@@ -254,7 +271,10 @@ network={{
                 logger.info(f"Versuche Verbindung zu bekanntem Netzwerk: {ssid}")
                 if self.connect_to_network(ssid, password):
                     return True
+            else:
+                logger.debug(f"Bekanntes Netzwerk '{ssid}' nicht verfügbar")
         
+        logger.info("Keine bekannten Netzwerke verfügbar oder Verbindung fehlgeschlagen")
         return False
     
     def start_hotspot(self):
@@ -519,12 +539,39 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
         except Exception as e:
             logger.error(f"Fehler beim Starten des Web-Servers: {e}")
     
+    def check_for_commands(self):
+        """Prüfe auf Befehle vom Interface"""
+        command_file = Path('/tmp/tipsy_wifi_command.json')
+        if command_file.exists():
+            try:
+                with open(command_file, 'r') as f:
+                    command = json.load(f)
+                
+                # Lösche Befehlsdatei nach dem Lesen
+                command_file.unlink()
+                
+                if command.get('action') == 'toggle_hotspot':
+                    logger.info("Toggle-Hotspot Befehl empfangen")
+                    self.toggle_manual_hotspot()
+                    return True
+                    
+            except Exception as e:
+                logger.error(f"Fehler beim Verarbeiten des Befehls: {e}")
+                try:
+                    command_file.unlink()
+                except:
+                    pass
+        return False
+    
     def run(self):
         """Hauptschleife des WiFi-Managers"""
         logger.info("Tipsy WiFi Manager gestartet")
         
         while True:
             try:
+                # Prüfe auf Befehle vom Interface
+                self.check_for_commands()
+                
                 # Prüfe ob manueller Hotspot angefordert wurde
                 if self.manual_hotspot_requested:
                     if not self.hotspot_active:
@@ -537,25 +584,29 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                         self.update_status('hotspot_active', 
                                          f"Manueller Hotspot aktiv: {self.hotspot_ssid}", 
                                          self.hotspot_ip, self.hotspot_ssid)
+                
                 # Normale Logik nur wenn kein manueller Hotspot angefordert
                 elif self.check_internet_connection():
+                    # Internetverbindung vorhanden
                     if self.hotspot_active:
                         logger.info("Internetverbindung erkannt, stoppe automatischen Hotspot")
                         self.stop_hotspot()
                     
                     # Hole aktuelle IP und SSID
                     result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
-                    ip = result.stdout.strip().split()[0] if result.returncode == 0 else ""
+                    ip = result.stdout.strip().split()[0] if result.returncode == 0 and result.stdout.strip() else ""
                     
                     # Versuche SSID zu ermitteln
                     result = subprocess.run(['iwgetid', '-r'], capture_output=True, text=True)
-                    ssid = result.stdout.strip() if result.returncode == 0 else ""
+                    ssid = result.stdout.strip() if result.returncode == 0 else "Unknown"
                     
                     self.update_status('connected', 'Mit WLAN verbunden', ip, ssid)
-                    logger.info(f"Verbunden mit {ssid}, IP: {ip}")
+                    logger.debug(f"Verbunden mit {ssid}, IP: {ip}")
                     
                 else:
                     # Keine Internetverbindung und kein manueller Hotspot
+                    logger.debug("Keine Internetverbindung erkannt")
+                    
                     if not self.hotspot_active:
                         logger.info("Keine Internetverbindung, versuche bekannte Netzwerke...")
                         
@@ -565,6 +616,9 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                                 # Starte Web-Server in separatem Thread
                                 web_thread = threading.Thread(target=self.start_web_server, daemon=True)
                                 web_thread.start()
+                            else:
+                                logger.error("Automatischer Hotspot konnte nicht gestartet werden")
+                                self.update_status('error', 'Hotspot-Start fehlgeschlagen', '', '')
                     else:
                         self.update_status('hotspot_active', 
                                          f"Automatischer Hotspot aktiv: {self.hotspot_ssid}", 
@@ -584,45 +638,8 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
         if self.hotspot_active:
             self.stop_hotspot()
 
-# Globale WiFi-Manager-Instanz für externe Steuerung
+# Globale WiFi-Manager-Instanz für Service
 _wifi_manager_instance = None
-
-def get_wifi_manager():
-    """Hole die globale WiFi-Manager-Instanz"""
-    global _wifi_manager_instance
-    if _wifi_manager_instance is None:
-        _wifi_manager_instance = WiFiManager()
-    return _wifi_manager_instance
-
-def toggle_hotspot():
-    """Toggle Hotspot von extern (für Interface)"""
-    try:
-        manager = get_wifi_manager()
-        manager.toggle_manual_hotspot()
-        return True
-    except Exception as e:
-        logger.error(f"Fehler beim Toggle des Hotspots: {e}")
-        return False
-
-def get_current_wifi_status():
-    """Hole aktuellen WiFi-Status für Interface"""
-    try:
-        status_file = Path('/tmp/tipsy_wifi_status.json')
-        if status_file.exists():
-            with open(status_file, 'r') as f:
-                return json.load(f)
-    except Exception as e:
-        logger.error(f"Fehler beim Laden des WiFi-Status: {e}")
-    
-    # Fallback
-    return {
-        'mode': 'unknown',
-        'status': 'unknown',
-        'ip': '',
-        'ssid': '',
-        'hotspot_active': False,
-        'manual_hotspot_requested': False
-    }
 
 def signal_handler(signum, frame):
     """Signal Handler für sauberes Beenden"""
