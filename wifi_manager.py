@@ -278,10 +278,87 @@ network={{
         logger.info("Keine bekannten Netzwerke verfügbar oder Verbindung fehlgeschlagen")
         return False
     
-    def start_hotspot(self):
-        """Starte WLAN-Hotspot"""
+    def start_hotspot_networkmanager(self):
+        """Starte Hotspot mit NetworkManager (moderne Methode für Pi 5)"""
         try:
-            logger.info("Starte WLAN-Hotspot...")
+            logger.info("Starte Hotspot mit NetworkManager...")
+            
+            # Lösche existierende Hotspot-Verbindung
+            subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Tipsy-Hotspot'], 
+                         capture_output=True)
+            
+            # Erstelle neue Hotspot-Verbindung
+            cmd = [
+                'sudo', 'nmcli', 'connection', 'add',
+                'type', 'wifi',
+                'ifname', 'wlan0',
+                'con-name', 'Tipsy-Hotspot',
+                'autoconnect', 'no',
+                'ssid', self.hotspot_ssid
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Fehler beim Erstellen der Hotspot-Verbindung: {result.stderr}")
+                return False
+            
+            # Konfiguriere Hotspot-Einstellungen
+            config_commands = [
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'wifi.mode', 'ap'],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'wifi.band', 'bg'],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'wifi.channel', '7'],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'wifi-sec.key-mgmt', 'wpa-psk'],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'wifi-sec.psk', self.hotspot_password],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'ipv4.method', 'shared'],
+                ['sudo', 'nmcli', 'connection', 'modify', 'Tipsy-Hotspot', 
+                 'ipv4.addresses', f'{self.hotspot_ip}/24']
+            ]
+            
+            for cmd in config_commands:
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    logger.error(f"Fehler bei Konfiguration: {' '.join(cmd[3:])}: {result.stderr}")
+                    return False
+            
+            # Aktiviere Hotspot
+            result = subprocess.run(['sudo', 'nmcli', 'connection', 'up', 'Tipsy-Hotspot'], 
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Fehler beim Aktivieren des Hotspots: {result.stderr}")
+                return False
+            
+            time.sleep(5)  # Warte bis Hotspot vollständig aktiv ist
+            
+            self.hotspot_active = True
+            self.current_mode = 'hotspot'
+            
+            logger.info(f"NetworkManager Hotspot '{self.hotspot_ssid}' erfolgreich gestartet")
+            logger.info(f"Hotspot-Passwort: {self.hotspot_password}")
+            self.update_status('hotspot_active', 
+                             f"Hotspot aktiv: {self.hotspot_ssid}", 
+                             self.hotspot_ip, self.hotspot_ssid)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Fehler beim NetworkManager Hotspot: {e}")
+            return False
+    
+    def start_hotspot_legacy(self):
+        """Starte Hotspot mit hostapd/dnsmasq (Fallback für ältere Systeme)"""
+        try:
+            logger.info("Starte Legacy-Hotspot mit hostapd...")
+            
+            # Stoppe NetworkManager für wlan0
+            subprocess.run(['sudo', 'nmcli', 'device', 'set', 'wlan0', 'managed', 'no'], 
+                         capture_output=True)
+            time.sleep(2)
             
             # Stoppe alle WLAN-Services
             subprocess.run(['sudo', 'killall', 'wpa_supplicant'], capture_output=True)
@@ -289,13 +366,19 @@ network={{
             subprocess.run(['sudo', 'killall', 'dnsmasq'], capture_output=True)
             time.sleep(3)
             
-            # Bringe WLAN-Interface runter und wieder hoch
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'down'], capture_output=True)
+            # Interface-Reset
+            subprocess.run(['sudo', 'ip', 'link', 'set', 'wlan0', 'down'], capture_output=True)
             time.sleep(1)
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'up'], capture_output=True)
+            subprocess.run(['sudo', 'ip', 'link', 'set', 'wlan0', 'up'], capture_output=True)
             time.sleep(2)
             
-            # Konfiguriere hostapd mit WPA2-Verschlüsselung
+            # Setze statische IP
+            subprocess.run(['sudo', 'ip', 'addr', 'flush', 'dev', 'wlan0'], capture_output=True)
+            subprocess.run(['sudo', 'ip', 'addr', 'add', f'{self.hotspot_ip}/24', 'dev', 'wlan0'], 
+                         capture_output=True)
+            time.sleep(1)
+            
+            # Erweiterte hostapd-Konfiguration für Pi 5
             hostapd_config = f"""interface=wlan0
 driver=nl80211
 ssid={self.hotspot_ssid}
@@ -308,59 +391,76 @@ ignore_broadcast_ssid=0
 wpa=2
 wpa_passphrase={self.hotspot_password}
 wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
+wpa_pairwise=TKIP CCMP
 rsn_pairwise=CCMP
+country_code=DE
+ieee80211n=1
+ieee80211d=1
 """
             
             with open('/tmp/hostapd.conf', 'w') as f:
                 f.write(hostapd_config)
             
-            # Konfiguriere dnsmasq
+            # Erweiterte dnsmasq-Konfiguration
             dnsmasq_config = f"""interface=wlan0
+bind-interfaces
+server=8.8.8.8
+domain-needed
+bogus-priv
 dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
 dhcp-option=3,192.168.4.1
 dhcp-option=6,192.168.4.1
-server=8.8.8.8
+dhcp-authoritative
 log-queries
 log-dhcp
-listen-address=192.168.4.1
 """
             
             with open('/tmp/dnsmasq.conf', 'w') as f:
                 f.write(dnsmasq_config)
             
-            # Setze statische IP mit Netzmaske
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', f'{self.hotspot_ip}', 'netmask', '255.255.255.0'], 
-                         capture_output=True, check=True)
-            time.sleep(1)
-            
-            # Starte hostapd im Hintergrund
+            # Starte hostapd
             hostapd_process = subprocess.Popen(['sudo', 'hostapd', '/tmp/hostapd.conf'], 
-                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(5)
+                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            time.sleep(8)  # Längere Wartezeit für Pi 5
             
-            # Prüfe ob hostapd läuft
+            # Prüfe hostapd-Status
             if hostapd_process.poll() is not None:
-                logger.error("hostapd konnte nicht gestartet werden")
+                stdout, stderr = hostapd_process.communicate()
+                logger.error(f"hostapd fehlgeschlagen: {stderr.decode()}")
                 return False
             
             # Starte dnsmasq
-            result = subprocess.run(['sudo', 'dnsmasq', '-C', '/tmp/dnsmasq.conf'], 
-                                  capture_output=True)
+            result = subprocess.run(['sudo', 'dnsmasq', '-C', '/tmp/dnsmasq.conf', '--log-facility=/tmp/dnsmasq.log'], 
+                                  capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"dnsmasq Start fehlgeschlagen: {result.stderr.decode()}")
+                logger.error(f"dnsmasq Start fehlgeschlagen: {result.stderr}")
                 return False
             
             self.hotspot_active = True
             self.current_mode = 'hotspot'
             
-            logger.info(f"Hotspot '{self.hotspot_ssid}' erfolgreich gestartet auf {self.hotspot_ip}")
-            logger.info(f"Hotspot-Passwort: {self.hotspot_password}")
-            self.update_status('hotspot_active', 
-                             f"Hotspot aktiv: {self.hotspot_ssid}", 
-                             self.hotspot_ip, self.hotspot_ssid)
-            
+            logger.info(f"Legacy Hotspot '{self.hotspot_ssid}' erfolgreich gestartet")
             return True
+            
+        except Exception as e:
+            logger.error(f"Fehler beim Legacy Hotspot: {e}")
+            return False
+    
+    def start_hotspot(self):
+        """Starte WLAN-Hotspot mit automatischer Methodenerkennung"""
+        try:
+            # Prüfe ob NetworkManager verfügbar ist
+            result = subprocess.run(['which', 'nmcli'], capture_output=True)
+            if result.returncode == 0:
+                logger.info("Verwende NetworkManager-Methode für Hotspot")
+                if self.start_hotspot_networkmanager():
+                    return True
+                else:
+                    logger.warning("NetworkManager-Methode fehlgeschlagen, versuche Legacy-Methode")
+            
+            # Fallback zu Legacy-Methode
+            logger.info("Verwende Legacy hostapd-Methode für Hotspot")
+            return self.start_hotspot_legacy()
             
         except Exception as e:
             logger.error(f"Fehler beim Starten des Hotspots: {e}")
@@ -368,24 +468,40 @@ listen-address=192.168.4.1
             return False
     
     def stop_hotspot(self):
-        """Stoppe WLAN-Hotspot"""
+        """Stoppe WLAN-Hotspot (beide Methoden)"""
         try:
             logger.info("Stoppe WLAN-Hotspot...")
             
-            # Stoppe Services
+            # Versuche NetworkManager-Hotspot zu stoppen
+            result = subprocess.run(['sudo', 'nmcli', 'connection', 'down', 'Tipsy-Hotspot'], 
+                                  capture_output=True)
+            if result.returncode == 0:
+                logger.info("NetworkManager Hotspot gestoppt")
+                # Lösche Hotspot-Verbindung
+                subprocess.run(['sudo', 'nmcli', 'connection', 'delete', 'Tipsy-Hotspot'], 
+                             capture_output=True)
+            
+            # Stoppe Legacy-Services (falls aktiv)
             subprocess.run(['sudo', 'killall', 'hostapd'], capture_output=True)
             subprocess.run(['sudo', 'killall', 'dnsmasq'], capture_output=True)
             time.sleep(2)
             
-            # Bringe Interface runter und wieder hoch für sauberen Reset
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'down'], capture_output=True)
-            time.sleep(1)
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'up'], capture_output=True)
+            # Reaktiviere NetworkManager für wlan0
+            subprocess.run(['sudo', 'nmcli', 'device', 'set', 'wlan0', 'managed', 'yes'], 
+                         capture_output=True)
             time.sleep(2)
             
-            # Entferne statische IP-Konfiguration
-            subprocess.run(['sudo', 'dhclient', '-r', 'wlan0'], capture_output=True)
+            # Interface-Reset
+            subprocess.run(['sudo', 'ip', 'addr', 'flush', 'dev', 'wlan0'], capture_output=True)
+            subprocess.run(['sudo', 'ip', 'link', 'set', 'wlan0', 'down'], capture_output=True)
             time.sleep(1)
+            subprocess.run(['sudo', 'ip', 'link', 'set', 'wlan0', 'up'], capture_output=True)
+            time.sleep(2)
+            
+            # Lasse NetworkManager das Interface wieder übernehmen
+            subprocess.run(['sudo', 'nmcli', 'device', 'disconnect', 'wlan0'], capture_output=True)
+            time.sleep(1)
+            subprocess.run(['sudo', 'nmcli', 'device', 'connect', 'wlan0'], capture_output=True)
             
             self.hotspot_active = False
             self.current_mode = 'client'

@@ -1,10 +1,15 @@
-# 🍹 Tipsy Hotspot Verbindung
+# 🍹 Tipsy Hotspot Verbindung (Raspberry Pi 5 Optimiert)
+
+## ⚠️ Wichtiger Hinweis für Raspberry Pi 5
+
+Der Raspberry Pi 5 mit Bookworm OS hat bekannte Probleme mit traditionellen Hotspot-Lösungen. Diese Implementation verwendet eine **moderne NetworkManager-basierte Lösung** mit automatischem Fallback.
 
 ## Hotspot-Informationen
 
 **SSID:** `Tipsy-Setup`  
 **Passwort:** `tipsy123`  
-**IP-Adresse:** `192.168.4.1`
+**IP-Adresse:** `192.168.4.1`  
+**Verschlüsselung:** WPA2-PSK
 
 ## Verbindung herstellen
 
@@ -63,13 +68,25 @@ Sobald du verbunden bist, öffnet sich automatisch die Setup-Seite oder du gehst
 - **DNS:** 8.8.8.8 (Google DNS)
 - **Gateway:** 192.168.4.1
 
-## Service-Status prüfen
+## 🛠️ Setup für Raspberry Pi 5
+
+**Vor der ersten Nutzung ausführen:**
+```bash
+chmod +x setup_pi5_hotspot.sh
+sudo ./setup_pi5_hotspot.sh
+```
+
+## 🔧 Service-Status prüfen
 
 ```bash
 # WiFi-Manager Status
 sudo systemctl status tipsy-wifi
 
-# Hotspot-Prozesse prüfen
+# NetworkManager Hotspot-Verbindungen
+nmcli connection show
+nmcli device status
+
+# Legacy Hotspot-Prozesse prüfen (Fallback)
 ps aux | grep hostapd
 ps aux | grep dnsmasq
 
@@ -77,3 +94,36 @@ ps aux | grep dnsmasq
 sudo journalctl -u tipsy-wifi -f
 tail -f /var/log/tipsy_wifi.log
 ```
+
+## 🧪 Hotspot-Test
+
+```bash
+# Teste NetworkManager-Funktionalität
+python3 /home/pi/test_hotspot.py
+
+# Manuelle NetworkManager-Tests
+sudo nmcli connection add type wifi ifname wlan0 con-name Test-AP ssid TestAP
+sudo nmcli connection modify Test-AP wifi.mode ap
+sudo nmcli connection modify Test-AP wifi-sec.key-mgmt wpa-psk
+sudo nmcli connection modify Test-AP wifi-sec.psk test123
+sudo nmcli connection modify Test-AP ipv4.method shared
+sudo nmcli connection up Test-AP
+```
+
+## 🚨 Bekannte Pi 5 Probleme & Lösungen
+
+### Problem: Hotspot erscheint nicht
+**Ursache:** NetworkManager-Konflikte mit dhcpcd  
+**Lösung:** Setup-Script ausführen, NetworkManager neu starten
+
+### Problem: Verbindung schlägt fehl
+**Ursache:** Veraltete hostapd-Konfiguration  
+**Lösung:** Moderne NetworkManager-Methode wird automatisch verwendet
+
+### Problem: WLAN-Interface nicht verfügbar
+**Ursache:** Interface von NetworkManager nicht verwaltet  
+**Lösung:** `sudo nmcli device set wlan0 managed yes`
+
+### Problem: Service startet nicht
+**Ursache:** Fehlende Abhängigkeiten  
+**Lösung:** `sudo apt install network-manager hostapd dnsmasq dhcpcd5`
