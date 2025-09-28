@@ -549,6 +549,19 @@ network={{
                                     time.sleep(2)
                                     if self.server.wifi_manager.connect_to_network(ssid, password):
                                         logger.info("✅ Web-Interface: Verbindung erfolgreich")
+                                        
+                                        # Starte Watchdog-Service neu bei Netzwerkwechsel
+                                        logger.info("🔄 Starte tipsy-watchdog.service neu...")
+                                        try:
+                                            result = subprocess.run(['sudo', 'systemctl', 'restart', 'tipsy-watchdog.service'], 
+                                                                  capture_output=True, text=True, timeout=10)
+                                            if result.returncode == 0:
+                                                logger.info("✅ tipsy-watchdog.service erfolgreich neu gestartet")
+                                            else:
+                                                logger.warning(f"⚠️  tipsy-watchdog.service Neustart: {result.stderr}")
+                                        except Exception as e:
+                                            logger.warning(f"⚠️  Fehler beim Watchdog-Neustart: {e}")
+                                        
                                         time.sleep(5)
                                         self.server.wifi_manager.stop_hotspot()
                                     else:
