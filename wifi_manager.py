@@ -521,88 +521,146 @@ log-dhcp
         
         class ConfigHandler(BaseHTTPRequestHandler):
             def do_GET(self):
-                if self.path == '/':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/html')
-                    self.end_headers()
-                    
-                    # Scanne verfügbare Netzwerke
-                    networks = self.server.wifi_manager.scan_networks()
-                    
-                    html = self.generate_config_page(networks)
-                    self.wfile.write(html.encode())
-                    
-                elif self.path == '/status':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    
-                    status = {
-                        'mode': self.server.wifi_manager.current_mode,
-                        'hotspot_active': self.server.wifi_manager.hotspot_active
-                    }
-                    self.wfile.write(json.dumps(status).encode())
-                    
-            def do_POST(self):
-                if self.path == '/connect':
-                    content_length = int(self.headers['Content-Length'])
-                    post_data = self.rfile.read(content_length)
-                    data = urllib.parse.parse_qs(post_data.decode())
-                    
-                    ssid = data.get('ssid', [''])[0]
-                    password = data.get('password', [''])[0]
-                    
-                    if ssid:
-                        logger.info(f"Verbindungsversuch zu {ssid} über Web-Interface")
-                        
-                        # Antwort senden bevor Verbindung versucht wird
+                try:
+                    if self.path == '/' or self.path == '/index.html':
                         self.send_response(200)
-                        self.send_header('Content-type', 'text/html')
+                        self.send_header('Content-type', 'text/html; charset=utf-8')
+                        self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
                         
-                        html = """
-                        <html><body>
-                        <h2>Verbindung wird hergestellt...</h2>
-                        <p>Bitte warten Sie einen Moment. Das Gerät versucht sich zu verbinden.</p>
-                        <p>Bei erfolgreicher Verbindung wird der Hotspot automatisch deaktiviert.</p>
-                        <script>
-                        setTimeout(function() {
-                            window.location.href = '/';
-                        }, 10000);
-                        </script>
-                        </body></html>
-                        """
-                        self.wfile.write(html.encode())
+                        # Scanne verfügbare Netzwerke
+                        networks = self.server.wifi_manager.scan_networks()
+                        logger.info(f"Gefundene Netzwerke für Web-Interface: {len(networks)}")
                         
-                        # Verbindung in separatem Thread versuchen
-                        def connect_thread():
-                            time.sleep(2)  # Kurz warten damit Response gesendet wird
-                            if self.server.wifi_manager.connect_to_network(ssid, password):
-                                logger.info("Verbindung erfolgreich, stoppe Hotspot")
-                                time.sleep(5)
-                                self.server.wifi_manager.stop_hotspot()
+                        html = self.generate_config_page(networks)
+                        self.wfile.write(html.encode('utf-8'))
                         
-                        threading.Thread(target=connect_thread, daemon=True).start()
+                    elif self.path == '/status':
+                        self.send_response(200)
+                        self.send_header('Content-type', 'application/json')
+                        self.send_header('Cache-Control', 'no-cache')
+                        self.end_headers()
+                        
+                        status = {
+                            'mode': self.server.wifi_manager.current_mode,
+                            'hotspot_active': self.server.wifi_manager.hotspot_active,
+                            'ssid': self.server.wifi_manager.hotspot_ssid
+                        }
+                        self.wfile.write(json.dumps(status).encode('utf-8'))
+                        
+                    else:
+                        # 404 für andere Pfade
+                        self.send_response(404)
+                        self.send_header('Content-type', 'text/html')
+                        self.end_headers()
+                        self.wfile.write(b'<h1>404 - Seite nicht gefunden</h1>')
+                        
+                except Exception as e:
+                    logger.error(f"Fehler in do_GET: {e}")
+                    self.send_response(500)
+                    self.end_headers()
+                    
+            def do_POST(self):
+                try:
+                    if self.path == '/connect':
+                        content_length = int(self.headers['Content-Length'])
+                        post_data = self.rfile.read(content_length)
+                        data = urllib.parse.parse_qs(post_data.decode('utf-8'))
+                        
+                        ssid = data.get('ssid', [''])[0]
+                        password = data.get('password', [''])[0]
+                        
+                        if ssid:
+                            logger.info(f"Verbindungsversuch zu {ssid} über Web-Interface")
+                            
+                            # Antwort senden bevor Verbindung versucht wird
+                            self.send_response(200)
+                            self.send_header('Content-type', 'text/html; charset=utf-8')
+                            self.end_headers()
+                            
+                            html = """
+                            <html><head><meta charset="utf-8"><title>Verbindung...</title></head><body>
+                            <div style="text-align: center; font-family: Arial; margin-top: 50px;">
+                            <h2>🍹 Verbindung wird hergestellt...</h2>
+                            <p>Bitte warten Sie einen Moment. Das Gerät versucht sich zu verbinden.</p>
+                            <p>Bei erfolgreicher Verbindung wird der Hotspot automatisch deaktiviert.</p>
+                            <div style="margin-top: 30px;">
+                                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto;"></div>
+                            </div>
+                            <style>
+                            @keyframes spin {
+                                0% { transform: rotate(0deg); }
+                                100% { transform: rotate(360deg); }
+                            }
+                            </style>
+                            <script>
+                            setTimeout(function() {
+                                window.location.href = '/';
+                            }, 15000);
+                            </script>
+                            </div></body></html>
+                            """
+                            self.wfile.write(html.encode('utf-8'))
+                            
+                            # Verbindung in separatem Thread versuchen
+                            def connect_thread():
+                                try:
+                                    time.sleep(2)  # Kurz warten damit Response gesendet wird
+                                    if self.server.wifi_manager.connect_to_network(ssid, password):
+                                        logger.info("Verbindung erfolgreich, stoppe Hotspot in 5 Sekunden")
+                                        time.sleep(5)
+                                        self.server.wifi_manager.stop_hotspot()
+                                    else:
+                                        logger.error(f"Verbindung zu {ssid} fehlgeschlagen")
+                                except Exception as e:
+                                    logger.error(f"Fehler im connect_thread: {e}")
+                            
+                            threading.Thread(target=connect_thread, daemon=True).start()
+                        else:
+                            self.send_response(400)
+                            self.end_headers()
+                            self.wfile.write(b'Kein SSID angegeben')
+                            
+                except Exception as e:
+                    logger.error(f"Fehler in do_POST: {e}")
+                    self.send_response(500)
+                    self.end_headers()
             
             def generate_config_page(self, networks):
                 """Generiere HTML-Konfigurationsseite"""
                 networks_html = ""
-                for network in networks:
-                    quality_bar = "🟢" if "70/" in network.get('quality', '') else "🟡" if "40/" in network.get('quality', '') else "🔴"
-                    lock_icon = "🔒" if network.get('encrypted', True) else "🔓"
-                    
-                    networks_html += f"""
-                    <div class="network-item" onclick="selectNetwork('{network['ssid']}', {str(network.get('encrypted', True)).lower()})">
-                        <span class="network-name">{lock_icon} {network['ssid']}</span>
-                        <span class="signal-strength">{quality_bar}</span>
-                    </div>
-                    """
+                if not networks:
+                    networks_html = "<p>Keine WLAN-Netzwerke gefunden. <a href='/' onclick='location.reload()'>Neu laden</a></p>"
+                else:
+                    for network in networks:
+                        quality = network.get('quality', '0/100')
+                        if '/' in quality:
+                            quality_num = int(quality.split('/')[0])
+                            if quality_num > 70:
+                                quality_bar = "🟢"
+                            elif quality_num > 40:
+                                quality_bar = "🟡"
+                            else:
+                                quality_bar = "🔴"
+                        else:
+                            quality_bar = "🔴"
+                        
+                        lock_icon = "🔒" if network.get('encrypted', True) else "🔓"
+                        ssid = network['ssid'].replace("'", "\\'")  # Escape für JavaScript
+                        
+                        networks_html += f"""
+                        <div class="network-item" onclick="selectNetwork('{ssid}', {str(network.get('encrypted', True)).lower()})">
+                            <span class="network-name">{lock_icon} {network['ssid']}</span>
+                            <span class="signal-strength">{quality_bar}</span>
+                        </div>
+                        """
                 
                 return f"""
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <title>Tipsy WLAN Setup</title>
+                    <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <style>
                         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }}
@@ -616,7 +674,10 @@ log-dhcp
                         input[type="text"], input[type="password"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }}
                         button {{ background: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }}
                         button:hover {{ background: #45a049; }}
+                        button:disabled {{ background: #cccccc; cursor: not-allowed; }}
                         .info {{ background: #e7f3ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+                        .refresh-btn {{ background: #2196f3; margin-bottom: 10px; }}
+                        .refresh-btn:hover {{ background: #1976d2; }}
                     </style>
                 </head>
                 <body>
@@ -625,9 +686,11 @@ log-dhcp
                         
                         <div class="info">
                             <strong>🍹 Willkommen beim Tipsy WLAN-Setup!</strong><br>
-                            Sie sind mit dem Hotspot <strong>{self.hotspot_ssid}</strong> verbunden.<br>
+                            Sie sind mit dem Hotspot <strong>{self.server.wifi_manager.hotspot_ssid}</strong> verbunden.<br>
                             Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie das Passwort ein.
                         </div>
+                        
+                        <button class="refresh-btn" onclick="location.reload()">🔄 Netzwerke neu laden</button>
                         
                         <h3>Verfügbare Netzwerke:</h3>
                         <div id="networks">
@@ -676,25 +739,54 @@ log-dhcp
                             // Aktiviere Connect-Button
                             document.getElementById('connectBtn').disabled = false;
                         }}
+                        
+                        // Auto-refresh alle 30 Sekunden
+                        setTimeout(function() {{
+                            location.reload();
+                        }}, 30000);
                     </script>
                 </body>
                 </html>
                 """
             
             def log_message(self, format, *args):
-                # Unterdrücke HTTP-Logs
-                pass
+                # Logge HTTP-Requests für Debugging
+                logger.debug(f"HTTP: {format % args}")
         
         try:
-            server = HTTPServer(('0.0.0.0', 80), ConfigHandler)
-            server.wifi_manager = self
-            self.web_server = server
+            # Versuche zuerst Port 80, dann Port 8080 als Fallback
+            ports_to_try = [80, 8080, 8000]
+            server = None
             
-            logger.info("Web-Server gestartet auf Port 80")
+            for port in ports_to_try:
+                try:
+                    server = HTTPServer(('0.0.0.0', port), ConfigHandler)
+                    server.wifi_manager = self
+                    self.web_server = server
+                    logger.info(f"Web-Server erfolgreich gestartet auf Port {port}")
+                    break
+                except OSError as e:
+                    if e.errno == 13:  # Permission denied
+                        logger.warning(f"Keine Berechtigung für Port {port}, versuche nächsten...")
+                        continue
+                    elif e.errno == 98:  # Address already in use
+                        logger.warning(f"Port {port} bereits belegt, versuche nächsten...")
+                        continue
+                    else:
+                        raise
+            
+            if server is None:
+                logger.error("Konnte keinen verfügbaren Port für Web-Server finden")
+                return
+            
+            # Starte Server
+            logger.info("Web-Server bereit für Verbindungen")
             server.serve_forever()
             
         except Exception as e:
-            logger.error(f"Fehler beim Starten des Web-Servers: {e}")
+            logger.error(f"Kritischer Fehler beim Starten des Web-Servers: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     def check_for_commands(self):
         """Prüfe auf Befehle vom Interface"""
@@ -736,7 +828,7 @@ log-dhcp
                         if self.start_hotspot():
                             # Starte Web-Server nur wenn er noch nicht läuft
                             if not self.web_server_running:
-                                web_thread = threading.Thread(target=self.start_web_server, daemon=True)
+                                web_thread = threading.Thread(target=self.start_web_server, daemon=False)
                                 web_thread.start()
                                 self.web_server_running = True
                     else:
@@ -774,7 +866,7 @@ log-dhcp
                             if self.start_hotspot():
                                 # Starte Web-Server nur wenn er noch nicht läuft
                                 if not self.web_server_running:
-                                    web_thread = threading.Thread(target=self.start_web_server, daemon=True)
+                                    web_thread = threading.Thread(target=self.start_web_server, daemon=False)
                                     web_thread.start()
                                     self.web_server_running = True
                             else:

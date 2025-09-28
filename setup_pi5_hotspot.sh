@@ -169,8 +169,50 @@ else
     echo "❌ wlan0 Interface nicht gefunden"
 fi
 
-# Erstelle Test-Script
-echo "📝 Erstelle Test-Script..."
+# Setze Berechtigungen für Web-Server
+echo "🔧 Konfiguriere Web-Server Berechtigungen..."
+# Erlaube non-root Prozessen Port 80 zu verwenden (falls nötig)
+sudo setcap 'cap_net_bind_service=+ep' /usr/bin/python3 2>/dev/null || true
+
+# Erstelle Test-Scripts
+echo "📝 Erstelle Test-Scripts..."
+
+# Web-Server Test-Script
+cat > /home/pi/test_webserver.py << 'EOF'
+#!/usr/bin/env python3
+import requests
+import socket
+import subprocess
+import time
+from pathlib import Path
+
+def test_web_server():
+    print("🧪 Teste Web-Server...")
+    
+    # Teste verschiedene Ports
+    ports = [80, 8080, 8000]
+    for port in ports:
+        try:
+            response = requests.get(f'http://192.168.4.1:{port}/', timeout=5)
+            if response.status_code == 200:
+                print(f"✅ Web-Server läuft auf Port {port}")
+                if 'Tipsy WLAN Setup' in response.text:
+                    print("✅ Setup-Seite funktioniert korrekt")
+                    return True
+                else:
+                    print("⚠️  Setup-Seite lädt, aber Inhalt fehlt")
+        except:
+            print(f"❌ Port {port} nicht erreichbar")
+    
+    return False
+
+if __name__ == "__main__":
+    test_web_server()
+EOF
+
+chmod +x /home/pi/test_webserver.py
+
+# Hotspot Test-Script
 cat > /home/pi/test_hotspot.py << 'EOF'
 #!/usr/bin/env python3
 import subprocess
@@ -234,7 +276,8 @@ echo "📋 Nächste Schritte:"
 echo "1. Starte den Tipsy WiFi Service: sudo systemctl start tipsy-wifi"
 echo "2. Prüfe Service-Status: sudo systemctl status tipsy-wifi"
 echo "3. Teste Hotspot-Funktionalität: python3 /home/pi/test_hotspot.py"
-echo "4. Prüfe Logs: sudo journalctl -u tipsy-wifi -f"
+echo "4. Teste Web-Server: python3 /home/pi/test_webserver.py"
+echo "5. Prüfe Logs: sudo journalctl -u tipsy-wifi -f"
 echo ""
 echo "🔧 Hotspot-Informationen:"
 echo "   SSID: Tipsy-Setup"
