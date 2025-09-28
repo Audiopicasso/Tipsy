@@ -78,3 +78,10 @@ if __name__ == "__main__":
     else:
         print("\n❌ WiFi-Manager Service läuft nicht oder Status-Datei fehlt")
         print("   Starte den Service mit: sudo systemctl start tipsy-wifi")
+        print("   Prüfe Service-Status: sudo systemctl status tipsy-wifi")
+        print("   Logs anzeigen: sudo journalctl -u tipsy-wifi -f")
+    
+    print("\n📋 Hotspot-Informationen:")
+    print("   SSID: Tipsy-Setup")
+    print("   Passwort: tipsy123")
+    print("   Setup-URL: http://192.168.4.1")

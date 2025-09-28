@@ -1221,12 +1221,16 @@ def run_interface():
                             
                             logger.info("Hotspot-Toggle Befehl gesendet")
                             
-                            # Warte kurz und aktualisiere dann den Status
+                            # Sofortiges visuelles Feedback und dann Status-Update
                             import threading
                             def delayed_update():
-                                time.sleep(1)  # Kurz warten bis Befehl verarbeitet wurde
-                                update_settings_tray_wifi_status(settings_ui)
+                                # Mehrere Updates um sicherzustellen dass Änderung erkannt wird
+                                for i in range(3):
+                                    time.sleep(2)  # Warte 2 Sekunden zwischen Updates
+                                    update_settings_tray_wifi_status(settings_ui)
                             
+                            # Sofortiges Update für visuelles Feedback
+                            update_settings_tray_wifi_status(settings_ui)
                             threading.Thread(target=delayed_update, daemon=True).start()
                             
                         except Exception as e:

@@ -43,8 +43,9 @@ class WiFiManager:
         
         # Hotspot Konfiguration
         self.hotspot_ssid = "Tipsy-Setup"
-        self.hotspot_password = None  # Kein Passwort = offener Hotspot
+        self.hotspot_password = "tipsy123"  # Einfaches Passwort für Stabilität
         self.hotspot_ip = "192.168.4.1"
+        self.web_server_running = False  # Flag um mehrfache Web-Server zu vermeiden
         
         # Stelle sicher, dass Konfigurationsverzeichnis existiert
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -282,14 +283,20 @@ network={{
         try:
             logger.info("Starte WLAN-Hotspot...")
             
-            # Stoppe wpa_supplicant
-            subprocess.run(['sudo', 'killall', 'wpa_supplicant'], 
-                         capture_output=True)
+            # Stoppe alle WLAN-Services
+            subprocess.run(['sudo', 'killall', 'wpa_supplicant'], capture_output=True)
+            subprocess.run(['sudo', 'killall', 'hostapd'], capture_output=True)
+            subprocess.run(['sudo', 'killall', 'dnsmasq'], capture_output=True)
+            time.sleep(3)
+            
+            # Bringe WLAN-Interface runter und wieder hoch
+            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'down'], capture_output=True)
+            time.sleep(1)
+            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'up'], capture_output=True)
             time.sleep(2)
             
-            # Konfiguriere hostapd (offener Hotspot ohne Passwort)
-            hostapd_config = f"""
-interface=wlan0
+            # Konfiguriere hostapd mit WPA2-Verschlüsselung
+            hostapd_config = f"""interface=wlan0
 driver=nl80211
 ssid={self.hotspot_ssid}
 hw_mode=g
@@ -298,34 +305,57 @@ wmm_enabled=0
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase={self.hotspot_password}
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
 """
             
             with open('/tmp/hostapd.conf', 'w') as f:
                 f.write(hostapd_config)
             
             # Konfiguriere dnsmasq
-            dnsmasq_config = f"""
-interface=wlan0
+            dnsmasq_config = f"""interface=wlan0
 dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+dhcp-option=3,192.168.4.1
+dhcp-option=6,192.168.4.1
+server=8.8.8.8
+log-queries
+log-dhcp
+listen-address=192.168.4.1
 """
             
             with open('/tmp/dnsmasq.conf', 'w') as f:
                 f.write(dnsmasq_config)
             
-            # Setze statische IP
-            subprocess.run(['sudo', 'ifconfig', 'wlan0', self.hotspot_ip])
+            # Setze statische IP mit Netzmaske
+            subprocess.run(['sudo', 'ifconfig', 'wlan0', f'{self.hotspot_ip}', 'netmask', '255.255.255.0'], 
+                         capture_output=True, check=True)
+            time.sleep(1)
             
-            # Starte hostapd
-            subprocess.Popen(['sudo', 'hostapd', '/tmp/hostapd.conf'])
-            time.sleep(3)
+            # Starte hostapd im Hintergrund
+            hostapd_process = subprocess.Popen(['sudo', 'hostapd', '/tmp/hostapd.conf'], 
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(5)
+            
+            # Prüfe ob hostapd läuft
+            if hostapd_process.poll() is not None:
+                logger.error("hostapd konnte nicht gestartet werden")
+                return False
             
             # Starte dnsmasq
-            subprocess.run(['sudo', 'dnsmasq', '-C', '/tmp/dnsmasq.conf'])
+            result = subprocess.run(['sudo', 'dnsmasq', '-C', '/tmp/dnsmasq.conf'], 
+                                  capture_output=True)
+            if result.returncode != 0:
+                logger.error(f"dnsmasq Start fehlgeschlagen: {result.stderr.decode()}")
+                return False
             
             self.hotspot_active = True
             self.current_mode = 'hotspot'
             
-            logger.info(f"Hotspot '{self.hotspot_ssid}' gestartet auf {self.hotspot_ip}")
+            logger.info(f"Hotspot '{self.hotspot_ssid}' erfolgreich gestartet auf {self.hotspot_ip}")
+            logger.info(f"Hotspot-Passwort: {self.hotspot_password}")
             self.update_status('hotspot_active', 
                              f"Hotspot aktiv: {self.hotspot_ssid}", 
                              self.hotspot_ip, self.hotspot_ssid)
@@ -334,6 +364,7 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
             
         except Exception as e:
             logger.error(f"Fehler beim Starten des Hotspots: {e}")
+            self.hotspot_active = False
             return False
     
     def stop_hotspot(self):
@@ -344,14 +375,23 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
             # Stoppe Services
             subprocess.run(['sudo', 'killall', 'hostapd'], capture_output=True)
             subprocess.run(['sudo', 'killall', 'dnsmasq'], capture_output=True)
+            time.sleep(2)
             
-            # Entferne statische IP
+            # Bringe Interface runter und wieder hoch für sauberen Reset
+            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'down'], capture_output=True)
+            time.sleep(1)
+            subprocess.run(['sudo', 'ifconfig', 'wlan0', 'up'], capture_output=True)
+            time.sleep(2)
+            
+            # Entferne statische IP-Konfiguration
             subprocess.run(['sudo', 'dhclient', '-r', 'wlan0'], capture_output=True)
+            time.sleep(1)
             
             self.hotspot_active = False
             self.current_mode = 'client'
+            self.web_server_running = False
             
-            logger.info("Hotspot gestoppt")
+            logger.info("Hotspot erfolgreich gestoppt")
             return True
             
         except Exception as e:
@@ -468,8 +508,9 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                         <h1>🍹 Tipsy WLAN Setup</h1>
                         
                         <div class="info">
-                            <strong>Willkommen beim Tipsy WLAN-Setup!</strong><br>
-                            Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie bei verschlüsselten Netzwerken das Passwort ein.
+                            <strong>🍹 Willkommen beim Tipsy WLAN-Setup!</strong><br>
+                            Sie sind mit dem Hotspot <strong>{self.hotspot_ssid}</strong> verbunden.<br>
+                            Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie das Passwort ein.
                         </div>
                         
                         <h3>Verfügbare Netzwerke:</h3>
@@ -577,9 +618,11 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                     if not self.hotspot_active:
                         logger.info("Starte manuell angeforderten Hotspot")
                         if self.start_hotspot():
-                            # Starte Web-Server in separatem Thread
-                            web_thread = threading.Thread(target=self.start_web_server, daemon=True)
-                            web_thread.start()
+                            # Starte Web-Server nur wenn er noch nicht läuft
+                            if not self.web_server_running:
+                                web_thread = threading.Thread(target=self.start_web_server, daemon=True)
+                                web_thread.start()
+                                self.web_server_running = True
                     else:
                         self.update_status('hotspot_active', 
                                          f"Manueller Hotspot aktiv: {self.hotspot_ssid}", 
@@ -613,9 +656,11 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                         if not self.try_known_networks():
                             logger.info("Keine bekannten Netzwerke verfügbar, starte automatischen Hotspot")
                             if self.start_hotspot():
-                                # Starte Web-Server in separatem Thread
-                                web_thread = threading.Thread(target=self.start_web_server, daemon=True)
-                                web_thread.start()
+                                # Starte Web-Server nur wenn er noch nicht läuft
+                                if not self.web_server_running:
+                                    web_thread = threading.Thread(target=self.start_web_server, daemon=True)
+                                    web_thread.start()
+                                    self.web_server_running = True
                             else:
                                 logger.error("Automatischer Hotspot konnte nicht gestartet werden")
                                 self.update_status('error', 'Hotspot-Start fehlgeschlagen', '', '')
@@ -624,8 +669,8 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                                          f"Automatischer Hotspot aktiv: {self.hotspot_ssid}", 
                                          self.hotspot_ip, self.hotspot_ssid)
                 
-                # Warte vor nächster Prüfung
-                time.sleep(30)
+                # Warte vor nächster Prüfung - kürzer für responsive Befehle
+                time.sleep(5)
                 
             except KeyboardInterrupt:
                 logger.info("WiFi Manager wird beendet...")
