@@ -38,8 +38,8 @@ sudo reboot
 
 ### Erste Einrichtung / Neue Party
 1. **Boot**: Pi startet und sucht nach bekannten WLANs
-2. **Hotspot**: Wenn keins gefunden wird, startet Hotspot "Tipsy-Setup"
-3. **Verbinden**: Verbinde dein Smartphone mit "Tipsy-Setup" (Passwort: `cocktail123`)
+2. **Hotspot**: Wenn keins gefunden wird, startet offener Hotspot "Tipsy-Setup"
+3. **Verbinden**: Verbinde dein Smartphone mit "Tipsy-Setup" (kein Passwort nötig)
 4. **Konfiguration**: Öffne `http://192.168.4.1` im Browser
 5. **WLAN auswählen**: Wähle das Party-WLAN aus der Liste
 6. **Passwort eingeben**: Gib das WLAN-Passwort ein
@@ -81,7 +81,7 @@ sudo systemctl start tipsy-wifi
 
 ### Hotspot-Konfiguration
 - **SSID**: Tipsy-Setup
-- **Passwort**: cocktail123
+- **Sicherheit**: Offen (kein Passwort)
 - **IP-Bereich**: 192.168.4.1 - 192.168.4.20
 - **Setup-URL**: http://192.168.4.1
 
@@ -119,8 +119,8 @@ sudo wpa_cli status
 ### Szenario: Party bei Freunden
 1. **Transport**: Tipsy im Auto, noch mit Heimnetz-Konfiguration
 2. **Ankunft**: Pi bootet, findet Heimnetz nicht
-3. **Automatisch**: Hotspot "Tipsy-Setup" startet nach 30 Sekunden
-4. **Setup**: Du verbindest dein Handy mit Hotspot
+3. **Automatisch**: Offener Hotspot "Tipsy-Setup" startet nach 30 Sekunden
+4. **Setup**: Du verbindest dein Handy mit Hotspot (kein Passwort nötig)
 5. **Konfiguration**: Öffnest http://192.168.4.1, wählst "FriendsWiFi"
 6. **Eingabe**: Gibst Passwort ein, klickst "Verbinden"
 7. **Wechsel**: Pi verbindet sich mit FriendsWiFi, Hotspot stoppt

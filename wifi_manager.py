@@ -42,7 +42,7 @@ class WiFiManager:
         
         # Hotspot Konfiguration
         self.hotspot_ssid = "Tipsy-Setup"
-        self.hotspot_password = "cocktail123"
+        self.hotspot_password = None  # Kein Passwort = offener Hotspot
         self.hotspot_ip = "192.168.4.1"
         
         # Stelle sicher, dass Konfigurationsverzeichnis existiert
@@ -229,7 +229,7 @@ network={{
                          capture_output=True)
             time.sleep(2)
             
-            # Konfiguriere hostapd
+            # Konfiguriere hostapd (offener Hotspot ohne Passwort)
             hostapd_config = f"""
 interface=wlan0
 driver=nl80211
@@ -240,11 +240,6 @@ wmm_enabled=0
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase={self.hotspot_password}
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
 """
             
             with open('/tmp/hostapd.conf', 'w') as f:
@@ -415,8 +410,8 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
                         <h1>🍹 Tipsy WLAN Setup</h1>
                         
                         <div class="info">
-                            <strong>Willkommen!</strong><br>
-                            Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie das Passwort ein.
+                            <strong>Willkommen beim Tipsy WLAN-Setup!</strong><br>
+                            Wählen Sie ein WLAN-Netzwerk aus der Liste und geben Sie bei verschlüsselten Netzwerken das Passwort ein.
                         </div>
                         
                         <h3>Verfügbare Netzwerke:</h3>
