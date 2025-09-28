@@ -298,29 +298,60 @@ network={{
     def check_internet_connection(self):
         """Prüfe Internetverbindung"""
         try:
-            # Hole aktuelle IP-Adresse zuerst
+            # Methode 1: Prüfe ob wir eine gültige IP haben (nicht Hotspot)
             result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
-            if result.returncode == 0:
-                ip = result.stdout.strip().split()[0] if result.stdout.strip() else ""
-                if ip and not ip.startswith('192.168.4.'):  # Nicht Hotspot-IP
-                    # Versuche DNS-Auflösung mit Timeout
-                    try:
-                        socket.setdefaulttimeout(5)  # 5 Sekunden Timeout
-                        socket.gethostbyname('8.8.8.8')  # Google DNS
-                        logger.debug(f"Internetverbindung aktiv, IP: {ip}")
-                        return True
-                    except socket.timeout:
-                        logger.debug("DNS-Timeout - keine Internetverbindung")
-                        return False
-                    except Exception as e:
-                        logger.debug(f"DNS-Fehler: {e}")
-                        return False
-                else:
-                    logger.debug(f"Keine gültige Client-IP gefunden: {ip}")
+            if result.returncode == 0 and result.stdout.strip():
+                ip = result.stdout.strip().split()[0]
+                logger.debug(f"Aktuelle IP: {ip}")
+                
+                # Wenn wir die Hotspot-IP haben, sind wir im Hotspot-Modus
+                if ip.startswith('192.168.4.'):
+                    logger.debug("Hotspot-IP erkannt - keine Client-Verbindung")
                     return False
+                
+                # Methode 2: Teste DNS-Auflösung
+                try:
+                    socket.setdefaulttimeout(3)
+                    socket.gethostbyname('google.com')  # DNS-Test
+                    logger.debug(f"Internet verfügbar über IP: {ip}")
+                    return True
+                except (socket.timeout, socket.gaierror):
+                    logger.debug("DNS-Auflösung fehlgeschlagen")
+                except Exception as e:
+                    logger.debug(f"DNS-Test Fehler: {e}")
+                
+                # Methode 3: Teste direkte Verbindung zu Google DNS
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(3)
+                    result = sock.connect_ex(('8.8.8.8', 53))
+                    sock.close()
+                    if result == 0:
+                        logger.debug(f"Internet verfügbar (direkte Verbindung) über IP: {ip}")
+                        return True
+                    else:
+                        logger.debug("Direkte Verbindung zu 8.8.8.8:53 fehlgeschlagen")
+                except Exception as e:
+                    logger.debug(f"Socket-Test Fehler: {e}")
+                
+                # Methode 4: Prüfe ob wir mit einem WLAN verbunden sind
+                try:
+                    result = subprocess.run(['iwgetid', '-r'], capture_output=True, text=True)
+                    if result.returncode == 0 and result.stdout.strip():
+                        ssid = result.stdout.strip()
+                        logger.debug(f"Mit WLAN '{ssid}' verbunden, aber kein Internet")
+                        return False  # Verbunden aber kein Internet
+                    else:
+                        logger.debug("Nicht mit WLAN verbunden")
+                        return False
+                except Exception as e:
+                    logger.debug(f"WLAN-Status Fehler: {e}")
+                
+                return False
             else:
                 logger.debug("Keine IP-Adresse gefunden")
                 return False
+                
         except Exception as e:
             logger.debug(f"Fehler bei Internetverbindungsprüfung: {e}")
             return False
@@ -886,6 +917,14 @@ log-dhcp
         """Hauptschleife des WiFi-Managers"""
         logger.info("Tipsy WiFi Manager gestartet")
         
+        # Initialer Status-Check beim Start
+        logger.info("Führe initialen Status-Check durch...")
+        initial_internet = self.check_internet_connection()
+        logger.info(f"Initiale Internet-Verbindung: {'verfügbar' if initial_internet else 'nicht verfügbar'}")
+        
+        if not initial_internet:
+            logger.info("Keine Internet-Verbindung beim Start - starte Hotspot-Fallback")
+        
         while True:
             try:
                 # Prüfe auf Befehle vom Interface
@@ -926,26 +965,41 @@ log-dhcp
                     
                 else:
                     # Keine Internetverbindung und kein manueller Hotspot
-                    logger.debug("Keine Internetverbindung erkannt")
+                    logger.info("Keine Internetverbindung erkannt")
                     
                     if not self.hotspot_active:
-                        logger.info("Keine Internetverbindung, versuche bekannte Netzwerke...")
+                        logger.info("Starte Hotspot-Fallback-Prozess...")
                         
-                        if not self.try_known_networks():
-                            logger.info("Keine bekannten Netzwerke verfügbar, starte automatischen Hotspot")
-                            if self.start_hotspot():
-                                # Starte Web-Server nur wenn er noch nicht läuft
-                                if not self.web_server_running:
-                                    web_thread = threading.Thread(target=self.start_web_server, daemon=False)
-                                    web_thread.start()
-                                    self.web_server_running = True
+                        # Versuche zuerst bekannte Netzwerke
+                        if self.known_networks:
+                            logger.info(f"Versuche {len(self.known_networks)} bekannte Netzwerke...")
+                            if self.try_known_networks():
+                                logger.info("Erfolgreich mit bekanntem Netzwerk verbunden")
+                                continue  # Springe zur nächsten Iteration
                             else:
-                                logger.error("Automatischer Hotspot konnte nicht gestartet werden")
-                                self.update_status('error', 'Hotspot-Start fehlgeschlagen', '', '')
+                                logger.info("Keine bekannten Netzwerke verfügbar oder Verbindung fehlgeschlagen")
+                        else:
+                            logger.info("Keine bekannten Netzwerke gespeichert")
+                        
+                        # Starte automatischen Hotspot
+                        logger.info("Starte automatischen Hotspot...")
+                        if self.start_hotspot():
+                            logger.info("Automatischer Hotspot erfolgreich gestartet")
+                            # Starte Web-Server nur wenn er noch nicht läuft
+                            if not self.web_server_running:
+                                logger.info("Starte Web-Server...")
+                                web_thread = threading.Thread(target=self.start_web_server, daemon=False)
+                                web_thread.start()
+                                self.web_server_running = True
+                        else:
+                            logger.error("Automatischer Hotspot konnte nicht gestartet werden")
+                            self.update_status('error', 'Hotspot-Start fehlgeschlagen', '', '')
                     else:
+                        # Hotspot bereits aktiv
                         self.update_status('hotspot_active', 
                                          f"Automatischer Hotspot aktiv: {self.hotspot_ssid}", 
                                          self.hotspot_ip, self.hotspot_ssid)
+                        logger.debug(f"Hotspot '{self.hotspot_ssid}' läuft bereits")
                 
                 # Warte vor nächster Prüfung - kürzer für responsive Befehle
                 time.sleep(5)
@@ -954,11 +1008,14 @@ log-dhcp
                 logger.info("WiFi Manager wird beendet...")
                 break
             except Exception as e:
-                logger.error(f"Unerwarteter Fehler: {e}")
+                logger.error(f"Unerwarteter Fehler in Hauptschleife: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 time.sleep(10)
         
         # Cleanup
         if self.hotspot_active:
+            logger.info("Stoppe Hotspot beim Beenden...")
             self.stop_hotspot()
 
 # Globale WiFi-Manager-Instanz für Service
